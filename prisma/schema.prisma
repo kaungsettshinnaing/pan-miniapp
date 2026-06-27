@@ -1,0 +1,154 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model RedemptionGroup {
+  id          String     @id @default(cuid())
+  groupName   String
+  description String?
+  merchants   Merchant[]
+  createdAt   DateTime   @default(now())
+}
+
+model Merchant {
+  merchantURL              String           @id
+  merchantName             String
+  outletName               String?
+  merchantTelegramID       String
+  active                   Boolean          @default(true)
+  botToken                 String?          // PAN admin only — if merchant has own bot
+  earnType                 EarnType         @default(PERCENTAGE)
+  earnValue                Float            @default(10) // % or fixed Ks amount
+  commissionType           CommissionType   @default(PERCENTAGE)
+  commissionValue          Float            @default(0)
+  subscriptionFee          Float            @default(0)
+  rebateValidityDays       Int              @default(14)
+  firstReminderDays        Int              @default(7)
+  secondReminderDays       Int              @default(3)
+  firstRecallCampaignDays  Int              @default(21)
+  secondRecallCampaignDays Int              @default(30)
+  redemptionGroupID        String?
+  redemptionGroup          RedemptionGroup? @relation(fields: [redemptionGroupID], references: [id])
+  cashbacks                Cashback[]
+  purchases                Purchase[]
+  otpSessions              OtpSession[]
+  messageTemplates         MessageTemplate[]
+  billing                  MonthlyBilling[]
+  createdAt                DateTime         @default(now())
+  updatedAt                DateTime         @updatedAt
+}
+
+model Customer {
+  customerTelegramID String     @id
+  username           String?
+  firstName          String?
+  lastName           String?
+  phoneNumber        String?
+  birthday           DateTime?
+  cashbacks          Cashback[]
+  purchases          Purchase[]
+  otpSessions        OtpSession[]
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+}
+
+model Cashback {
+  id                 String    @id @default(cuid())
+  merchantURL        String
+  customerTelegramID String
+  cashbackAmt        Float
+  expiryDate         DateTime
+  redeemed           Boolean   @default(false)
+  redemptionDate     DateTime?
+  merchant           Merchant  @relation(fields: [merchantURL], references: [merchantURL])
+  customer           Customer  @relation(fields: [customerTelegramID], references: [customerTelegramID])
+  createdAt          DateTime  @default(now())
+
+  @@index([merchantURL, customerTelegramID, redeemed, expiryDate])
+}
+
+model Purchase {
+  id                 String   @id @default(cuid())
+  merchantURL        String
+  customerTelegramID String
+  amount             Float
+  rebateDeducted     Float    @default(0)
+  commissionEarned   Float    @default(0)
+  note               String?
+  merchant           Merchant @relation(fields: [merchantURL], references: [merchantURL])
+  customer           Customer @relation(fields: [customerTelegramID], references: [customerTelegramID])
+  createdAt          DateTime @default(now())
+
+  @@index([merchantURL, customerTelegramID, createdAt])
+}
+
+model OtpSession {
+  id                 String   @id @default(cuid())
+  customerTelegramID String
+  merchantURL        String
+  otpCode            String   // 4-digit code
+  totalCashback      Float
+  expiresAt          DateTime
+  used               Boolean  @default(false)
+  merchant           Merchant @relation(fields: [merchantURL], references: [merchantURL])
+  customer           Customer @relation(fields: [customerTelegramID], references: [customerTelegramID])
+  createdAt          DateTime @default(now())
+
+  @@index([otpCode, merchantURL, used, expiresAt])
+}
+
+model MessageTemplate {
+  id          String          @id @default(cuid())
+  merchantURL String
+  platform    Platform        @default(TELEGRAM)
+  trigger     MessageTrigger
+  messageText String?         // supports {{variables}}
+  imageURL    String?
+  merchant    Merchant        @relation(fields: [merchantURL], references: [merchantURL])
+  updatedAt   DateTime        @updatedAt
+
+  @@unique([merchantURL, platform, trigger])
+}
+
+model MonthlyBilling {
+  id              String   @id @default(cuid())
+  merchantURL     String
+  billingMonth    String   // "YYYY-MM"
+  totalCommission Float    @default(0)
+  subscriptionFee Float    @default(0)
+  totalDue        Float    @default(0)
+  paid            Boolean  @default(false)
+  merchant        Merchant @relation(fields: [merchantURL], references: [merchantURL])
+  createdAt       DateTime @default(now())
+
+  @@unique([merchantURL, billingMonth])
+}
+
+enum EarnType {
+  PERCENTAGE
+  FIXED
+}
+
+enum CommissionType {
+  PERCENTAGE
+  FLAT
+}
+
+enum Platform {
+  TELEGRAM
+}
+
+enum MessageTrigger {
+  CASHBACK_ISSUED
+  CASHBACK_ISSUED_WITH_REDEMPTION
+  REDEMPTION_FAILURE
+  EXPIRY_FIRST_REMINDER
+  EXPIRY_SECOND_REMINDER
+  FIRST_RECALL_CAMPAIGN
+  SECOND_RECALL_CAMPAIGN
+}
