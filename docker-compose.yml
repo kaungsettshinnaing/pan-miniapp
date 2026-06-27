@@ -1,0 +1,21 @@
+# Local development — PostgreSQL only; run the Next.js app with `npm run dev`
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: pan_user
+      POSTGRES_PASSWORD: pan_password
+      POSTGRES_DB: pan_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pan_user -d pan_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:

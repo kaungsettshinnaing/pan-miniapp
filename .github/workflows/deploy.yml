@@ -1,0 +1,57 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]          # push to main → UAT
+    tags: ['v*']              # push tag v* → production
+
+jobs:
+  deploy:
+    name: ${{ startsWith(github.ref, 'refs/tags/') && 'Production' || 'UAT' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve deploy target
+        id: target
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            echo "env=production"  >> "$GITHUB_OUTPUT"
+            echo "dir=/opt/pan-miniapp"   >> "$GITHUB_OUTPUT"
+            echo "port=3001"       >> "$GITHUB_OUTPUT"
+          else
+            echo "env=uat"         >> "$GITHUB_OUTPUT"
+            echo "dir=/opt/pan-miniapp-uat" >> "$GITHUB_OUTPUT"
+            echo "port=3000"       >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          script: |
+            set -e
+            cd ${{ steps.target.outputs.dir }}
+
+            # Pull latest code
+            git fetch origin
+            git reset --hard origin/${{ startsWith(github.ref, 'refs/tags/') && 'main' || 'main' }}
+
+            # Rebuild and restart — Compose handles restart policy
+            docker compose -f docker-compose.prod.yml \
+              --env-file .env.prod \
+              up --build -d
+
+            # Wait for app to be healthy then run migrations
+            sleep 10
+            docker compose -f docker-compose.prod.yml \
+              --env-file .env.prod \
+              exec -T app \
+              npx prisma migrate deploy
+
+            echo "Deployed to ${{ steps.target.outputs.env }} ✓"
