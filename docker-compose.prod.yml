@@ -1,5 +1,5 @@
-# VPS production / UAT stack — both Next.js app and PostgreSQL in Docker
-# Copy env.example to .env.prod and fill in values before deploying
+# VPS production / UAT stack — routed by Traefik (already running on host)
+# Copy env.example to .env.prod and fill in DOMAIN, APP_ENV, and secrets
 services:
   postgres:
     image: postgres:16-alpine
@@ -25,18 +25,25 @@ services:
     env_file: .env.prod
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
-    ports:
-      - "${APP_PORT:-3000}:3000"
+    labels:
+      - "traefik.enable=true"
+      # Route this domain to port 3000 inside the container
+      - "traefik.http.routers.${APP_ENV}.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.${APP_ENV}.entrypoints=websecure"
+      - "traefik.http.routers.${APP_ENV}.tls.certresolver=letsencrypt"
+      - "traefik.http.services.${APP_ENV}.loadbalancer.server.port=3000"
+      - "traefik.docker.network=traefik-public"
     depends_on:
       postgres:
         condition: service_healthy
     networks:
       - pan-internal
-      - pan-public
+      - traefik-public   # Traefik must be able to reach the app
 
 networks:
-  pan-internal:          # app ↔ postgres (not exposed to host)
-  pan-public:            # app ↔ nginx reverse proxy
+  pan-internal:          # app ↔ postgres only
+  traefik-public:
+    external: true       # already created by Traefik on this host
 
 volumes:
   postgres_data:
