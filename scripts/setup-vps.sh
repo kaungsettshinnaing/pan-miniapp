@@ -33,7 +33,7 @@ for DIR in "$UAT_DIR" "$PROD_DIR"; do
   if [ ! -d "$DIR" ]; then
     mkdir -p "$DIR"
     echo "Created $DIR — clone your repo there:"
-    echo "  git clone git@github.com:YOUR_ORG/pan-miniapp.git $DIR"
+    echo "  git clone git@github.com:kaungsettshinnaing/pan-miniapp.git $DIR"
   else
     echo "$DIR already exists."
   fi
