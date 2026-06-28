@@ -78,6 +78,7 @@ export async function POST(request: Request) {
       merchantURL,
       customerName: [user.first_name, user.last_name].filter(Boolean).join(" "),
       totalCashback,
+      otpCode,
       sessionId: session.id,
     }).catch((e) => console.error("[earn] notify merchant failed:", e));
 
@@ -103,6 +104,7 @@ async function notifyMerchant(payload: {
   merchantURL: string;
   customerName: string;
   totalCashback: number;
+  otpCode: string;
   sessionId: string;
 }) {
   const n8nUrl = await getSetting("N8N_WEBHOOK_URL");

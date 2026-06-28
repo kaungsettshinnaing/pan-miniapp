@@ -1,0 +1,55 @@
+{
+  "name": "PAN - Merchant Notify (Mini App)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "pan-merchant-notify",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "id": "a1b2c3d4-0001-4000-8000-000000000001",
+      "name": "Webhook"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.body.merchantTelegramID }}",
+        "text": "=🔔 <b>New Cashback Customer</b>\n\n👤 <b>Customer:</b> {{ $json.body.customerName }}\n💰 <b>Balance:</b> Ks {{ $json.body.totalCashback }}\n🔑 <b>PIN:</b> <code>{{ $json.body.otpCode }}</code>\n\nAsk customer to show their PIN on screen and enter it + purchase amount to process.",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [480, 300],
+      "id": "a1b2c3d4-0001-4000-8000-000000000002",
+      "name": "Notify Cashier",
+      "credentials": {
+        "telegramApi": {
+          "id": "1JWTAD3T5mQJSAtS",
+          "name": "PyanAnnNgwe_bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Notify Cashier",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
