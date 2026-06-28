@@ -49,6 +49,18 @@ const SETTING_LABELS: Record<string, string> = {
   CASHBACK_APP_NAME: "App Name",
 };
 
+// Fully blank new-merchant form (string-typed; coerced to numbers on submit)
+const BLANK_MERCHANT = {
+  merchantURL: "", merchantName: "", outletName: "", merchantTelegramID: "",
+  earnType: "", earnValue: "",
+  commissionType: "", commissionBasis: "", commissionValue: "",
+  subscriptionFee: "", rebateValidityDays: "",
+  botToken: "",
+  firstReminderDays: "", secondReminderDays: "",
+  firstRecallCampaignDays: "", secondRecallCampaignDays: "",
+  redemptionGroupID: "", channelPartnerID: "",
+};
+
 function ToggleGroup({ label, options, value, onChange }: {
   label: string;
   options: { value: string; label: string }[];
@@ -87,6 +99,8 @@ export default function AdminPage() {
   const [saving, setSaving] = useState<string | null>(null);
   const [editMerchant, setEditMerchant] = useState<Merchant | null>(null);
   const [merchantSaving, setMerchantSaving] = useState(false);
+  const [newMerchant, setNewMerchant] = useState<typeof BLANK_MERCHANT | null>(null);
+  const [newMerchantSaving, setNewMerchantSaving] = useState(false);
   const [templatesMerchantURL, setTemplatesMerchantURL] = useState<string | null>(null);
   const [newUser, setNewUser] = useState<{ username: string; password: string; role: "ADMIN" | "MERCHANT" | "CHANNEL_PARTNER"; merchantURL: string; redemptionGroupID: string; profitSharePct: string } | null>(null);
   const [newUserSaving, setNewUserSaving] = useState(false);
@@ -231,6 +245,43 @@ export default function AdminPage() {
     }
   }
 
+  async function createMerchant() {
+    if (!newMerchant) return;
+    setNewMerchantSaving(true);
+    try {
+      const f = newMerchant;
+      await apiFetch("/api/admin/merchants", {
+        method: "POST",
+        body: JSON.stringify({
+          merchantURL: f.merchantURL.trim(),
+          merchantName: f.merchantName,
+          outletName: f.outletName || null,
+          merchantTelegramID: f.merchantTelegramID || "",
+          botToken: f.botToken || null,
+          earnType: f.earnType,
+          earnValue: Number(f.earnValue || 0),
+          commissionType: f.commissionType,
+          commissionBasis: f.commissionBasis || "RETURN_TRANSACTION",
+          commissionValue: Number(f.commissionValue || 0),
+          subscriptionFee: Number(f.subscriptionFee || 0),
+          rebateValidityDays: Number(f.rebateValidityDays || 14),
+          ...(f.firstReminderDays ? { firstReminderDays: Number(f.firstReminderDays) } : {}),
+          ...(f.secondReminderDays ? { secondReminderDays: Number(f.secondReminderDays) } : {}),
+          ...(f.firstRecallCampaignDays ? { firstRecallCampaignDays: Number(f.firstRecallCampaignDays) } : {}),
+          ...(f.secondRecallCampaignDays ? { secondRecallCampaignDays: Number(f.secondRecallCampaignDays) } : {}),
+          redemptionGroupID: f.redemptionGroupID || null,
+          channelPartnerID: f.channelPartnerID || null,
+        }),
+      });
+      await load();
+      setNewMerchant(null);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Create failed");
+    } finally {
+      setNewMerchantSaving(false);
+    }
+  }
+
   if (loading) return (
     <main className="max-w-[480px] mx-auto min-h-screen bg-pan-navy px-4 pt-6 pb-10">
       <div className="animate-pulse space-y-3">
@@ -308,6 +359,13 @@ export default function AdminPage() {
       {/* Merchants tab */}
       {tab === "merchants" && (
         <div className="space-y-3">
+          <button
+            onClick={() => setNewMerchant({ ...BLANK_MERCHANT })}
+            className="w-full rounded-xl py-3 text-sm font-bold text-white cursor-pointer"
+            style={{ background: "linear-gradient(135deg,#f0206a,#c01253)" }}
+          >
+            + Add Merchant
+          </button>
           {merchants.map((m) => (
             <div key={m.merchantURL} className="rounded-xl bg-pan-card border border-pan-border p-4">
               <div className="flex justify-between items-start mb-1">
@@ -708,6 +766,194 @@ export default function AdminPage() {
                 style={{ background: "linear-gradient(135deg,#f0206a,#c01253)" }}
               >
                 {merchantSaving ? "Saving…" : "Save"}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Add Merchant — fully blank form */}
+      {newMerchant && (
+        <>
+          <div className="fixed inset-0 z-40 bg-black/60" onClick={() => setNewMerchant(null)} />
+          <div className="fixed bottom-0 left-0 right-0 z-50 max-w-[480px] mx-auto rounded-t-2xl bg-pan-overlay px-5 pt-4 pb-10 shadow-2xl overflow-y-auto max-h-[90vh]">
+            <div className="mx-auto mb-4 w-10 h-1 rounded-full bg-pan-border" />
+            <h2 className="text-lg font-bold text-white mb-5">Add Merchant</h2>
+
+            {/* ── Section A: Merchant Setup ── */}
+            <div className="mb-4">
+              <p className="text-pan-muted text-xs uppercase tracking-widest font-bold mb-1">Merchant URL (unique slug)</p>
+              <p className="text-pan-muted text-[10px] mb-1">e.g. MyShop — used in the QR code; cannot be changed later</p>
+              <input
+                type="text" autoCapitalize="none"
+                value={newMerchant.merchantURL}
+                onChange={(e) => setNewMerchant({ ...newMerchant, merchantURL: e.target.value })}
+                className="w-full bg-pan-card border border-pan-border rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-pan-pink"
+              />
+            </div>
+            {([
+              { label: "Business Name", field: "merchantName" as const },
+              { label: "Outlet Name", field: "outletName" as const },
+              { label: "Cashier Telegram ID", field: "merchantTelegramID" as const },
+            ]).map(({ label, field }) => (
+              <div key={field} className="mb-4">
+                <p className="text-pan-muted text-xs uppercase tracking-widest font-bold mb-1">{label}</p>
+                <input
+                  type="text"
+                  value={newMerchant[field]}
+                  onChange={(e) => setNewMerchant({ ...newMerchant, [field]: e.target.value })}
+                  className="w-full bg-pan-card border border-pan-border rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-pan-pink"
+                />
+              </div>
+            ))}
+
+            <ToggleGroup
+              label="Earn Type"
+              options={[{ value: "PERCENTAGE", label: "%" }, { value: "FIXED", label: "Fixed Ks" }]}
+              value={newMerchant.earnType}
+              onChange={(v) => setNewMerchant({ ...newMerchant, earnType: v })}
+            />
+            <div className="mb-4">
+              <p className="text-pan-muted text-xs uppercase tracking-widest font-bold mb-1">
+                Earn Value {newMerchant.earnType === "FIXED" ? "(fixed Ks per transaction)" : "(% of net purchase)"}
+              </p>
+              <input
+                type="number" min="0" step="0.1"
+                value={newMerchant.earnValue}
+                onChange={(e) => setNewMerchant({ ...newMerchant, earnValue: e.target.value })}
+                className="w-full bg-pan-card border border-pan-border rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-pan-pink"
+              />
+            </div>
+
+            <ToggleGroup
+              label="Commission Type"
+              options={[{ value: "PERCENTAGE", label: "%" }, { value: "FLAT", label: "Flat Ks" }]}
+              value={newMerchant.commissionType}
+              onChange={(v) => setNewMerchant({ ...newMerchant, commissionType: v })}
+            />
+            {newMerchant.commissionType === "PERCENTAGE" && (
+              <ToggleGroup
+                label="Commission Basis"
+                options={[
+                  { value: "RETURN_TRANSACTION", label: "Return Visit" },
+                  { value: "INITIAL_TRANSACTION", label: "Original Visit" },
+                ]}
+                value={newMerchant.commissionBasis}
+                onChange={(v) => setNewMerchant({ ...newMerchant, commissionBasis: v })}
+              />
+            )}
+            <div className="mb-4">
+              <p className="text-pan-muted text-xs uppercase tracking-widest font-bold mb-1">
+                {newMerchant.commissionType === "FLAT" ? "Commission (flat Ks)" : "Commission (% of gross purchase)"}
+              </p>
+              <input
+                type="number" min="0" step="0.1"
+                value={newMerchant.commissionValue}
+                onChange={(e) => setNewMerchant({ ...newMerchant, commissionValue: e.target.value })}
+                className="w-full bg-pan-card border border-pan-border rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-pan-pink"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              <div>
+                <p className="text-pan-muted text-xs uppercase tracking-widest font-bold mb-1">Subscription (Ks/mo)</p>
+                <input
+                  type="number" min="0"
+                  value={newMerchant.subscriptionFee}
+                  onChange={(e) => setNewMerchant({ ...newMerchant, subscriptionFee: e.target.value })}
+                  className="w-full bg-pan-card border border-pan-border rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-pan-pink"
+                />
+              </div>
+              <div>
+                <p className="text-pan-muted text-xs uppercase tracking-widest font-bold mb-1">Cashback valid (days)</p>
+                <input
+                  type="number" min="0"
+                  value={newMerchant.rebateValidityDays}
+                  onChange={(e) => setNewMerchant({ ...newMerchant, rebateValidityDays: e.target.value })}
+                  className="w-full bg-pan-card border border-pan-border rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-pan-pink"
+                />
+              </div>
+            </div>
+
+            <div className="mb-4">
+              <p className="text-pan-muted text-xs uppercase tracking-widest font-bold mb-1">Custom Bot Token</p>
+              <input
+                type="text"
+                value={newMerchant.botToken}
+                onChange={(e) => setNewMerchant({ ...newMerchant, botToken: e.target.value })}
+                placeholder="Leave blank to use PAN shared bot"
+                className="w-full bg-pan-card border border-pan-border rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-pan-pink"
+              />
+            </div>
+
+            <div className="mb-4">
+              <p className="text-pan-muted text-xs uppercase tracking-widest font-bold mb-1">Redemption Group</p>
+              <select
+                value={newMerchant.redemptionGroupID}
+                onChange={(e) => setNewMerchant({ ...newMerchant, redemptionGroupID: e.target.value })}
+                className="w-full bg-pan-card border border-pan-border rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-pan-pink"
+              >
+                <option value="">— none (standalone) —</option>
+                {redemptionGroups.map((g) => (
+                  <option key={g.id} value={g.id}>{g.groupName}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="mb-5">
+              <p className="text-pan-muted text-xs uppercase tracking-widest font-bold mb-1">Channel Partner</p>
+              <select
+                value={newMerchant.channelPartnerID}
+                onChange={(e) => setNewMerchant({ ...newMerchant, channelPartnerID: e.target.value })}
+                className="w-full bg-pan-card border border-pan-border rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-pan-pink"
+              >
+                <option value="">— none —</option>
+                {webUsers.filter((u) => u.role === "CHANNEL_PARTNER").map((u) => (
+                  <option key={u.id} value={u.id}>{u.username}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* ── Section B: Communication Setup (optional; defaults applied if blank) ── */}
+            <div className="border-t border-pan-border pt-5 mb-5">
+              <p className="text-pan-gold text-xs font-bold uppercase tracking-widest mb-1">Communication Setup</p>
+              <p className="text-pan-muted text-[10px] mb-3">Leave blank to use defaults; edit message templates after creating.</p>
+              <div className="grid grid-cols-2 gap-3">
+                {([
+                  { label: "Reminder 1 (days before)", field: "firstReminderDays" as const },
+                  { label: "Reminder 2 (days before)", field: "secondReminderDays" as const },
+                  { label: "Win-back 1 (days since visit)", field: "firstRecallCampaignDays" as const },
+                  { label: "Win-back 2 (days since visit)", field: "secondRecallCampaignDays" as const },
+                ]).map(({ label, field }) => (
+                  <div key={field}>
+                    <p className="text-pan-muted text-xs font-bold mb-1">{label}</p>
+                    <input
+                      type="number" min="0"
+                      value={newMerchant[field]}
+                      onChange={(e) => setNewMerchant({ ...newMerchant, [field]: e.target.value })}
+                      className="w-full bg-pan-card border border-pan-border rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-pan-pink"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button onClick={() => setNewMerchant(null)} className="flex-1 rounded-xl py-3 text-sm font-bold text-pan-muted border border-pan-border cursor-pointer">Cancel</button>
+              <button
+                onClick={createMerchant}
+                disabled={
+                  newMerchantSaving ||
+                  !newMerchant.merchantURL.trim() ||
+                  !newMerchant.merchantName.trim() ||
+                  !newMerchant.earnType ||
+                  !newMerchant.earnValue ||
+                  !newMerchant.commissionType
+                }
+                className="flex-1 rounded-xl py-3 text-sm font-bold text-white disabled:opacity-40 cursor-pointer"
+                style={{ background: "linear-gradient(135deg,#f0206a,#c01253)" }}
+              >
+                {newMerchantSaving ? "Creating…" : "Create Merchant"}
               </button>
             </div>
           </div>
