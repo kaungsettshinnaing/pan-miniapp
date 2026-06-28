@@ -7,7 +7,10 @@ export async function GET(request: Request) {
     await requireAdmin(request);
     const merchants = await prisma.merchant.findMany({
       orderBy: { merchantName: "asc" },
-      include: { redemptionGroup: { select: { groupName: true } } },
+      include: {
+        redemptionGroup: { select: { groupName: true } },
+        channelPartner: { select: { username: true } },
+      },
     });
     return ok(merchants);
   } catch (e) {
@@ -38,6 +41,7 @@ export async function PATCH(request: Request) {
       firstRecallCampaignDays?: number;
       secondRecallCampaignDays?: number;
       redemptionGroupID?: string | null;
+      channelPartnerID?: string | null;
     };
     if (!body.merchantURL) return err("merchantURL is required", 400);
     const {
@@ -46,7 +50,7 @@ export async function PATCH(request: Request) {
       earnType, earnValue, commissionType, commissionBasis, commissionValue,
       subscriptionFee, rebateValidityDays,
       firstReminderDays, secondReminderDays, firstRecallCampaignDays, secondRecallCampaignDays,
-      redemptionGroupID,
+      redemptionGroupID, channelPartnerID,
     } = body;
     const merchant = await prisma.merchant.update({
       where: { merchantURL },
@@ -68,6 +72,7 @@ export async function PATCH(request: Request) {
         ...(firstRecallCampaignDays !== undefined && { firstRecallCampaignDays }),
         ...(secondRecallCampaignDays !== undefined && { secondRecallCampaignDays }),
         ...(redemptionGroupID !== undefined && { redemptionGroupID }),
+        ...(channelPartnerID !== undefined && { channelPartnerID }),
       },
     });
     return ok(merchant);

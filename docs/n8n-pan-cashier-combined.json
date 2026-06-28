@@ -92,7 +92,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "https://uat.cashbackapp.cloud/api/redeem",
+        "url": "={{ $('Webhook').item.json.body.appBaseURL }}/api/redeem",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [

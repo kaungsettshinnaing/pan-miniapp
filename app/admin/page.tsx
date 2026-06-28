@@ -39,6 +39,8 @@ type Merchant = {
   secondRecallCampaignDays: number;
   redemptionGroupID: string | null;
   redemptionGroup: { groupName: string } | null;
+  channelPartnerID: string | null;
+  channelPartner: { username: string } | null;
 };
 
 const SETTING_LABELS: Record<string, string> = {
@@ -217,6 +219,7 @@ export default function AdminPage() {
           firstRecallCampaignDays: editMerchant.firstRecallCampaignDays,
           secondRecallCampaignDays: editMerchant.secondRecallCampaignDays,
           redemptionGroupID: editMerchant.redemptionGroupID,
+          channelPartnerID: editMerchant.channelPartnerID,
         }),
       });
       await load();
@@ -324,6 +327,7 @@ export default function AdminPage() {
               <p className="text-pan-muted text-xs mb-3">
                 Sub: Ks {m.subscriptionFee}
                 {m.redemptionGroup ? ` · Group: ${m.redemptionGroup.groupName}` : ""}
+                {m.channelPartner ? ` · CP: ${m.channelPartner.username}` : ""}
                 {m.botToken ? " · Custom bot" : ""}
               </p>
               <button
@@ -633,6 +637,20 @@ export default function AdminPage() {
                 <option value="">— none (standalone) —</option>
                 {redemptionGroups.map((g) => (
                   <option key={g.id} value={g.id}>{g.groupName}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="mb-4">
+              <p className="text-pan-muted text-xs uppercase tracking-widest font-bold mb-1">Channel Partner</p>
+              <select
+                value={editMerchant.channelPartnerID ?? ""}
+                onChange={(e) => setEditMerchant({ ...editMerchant, channelPartnerID: e.target.value || null })}
+                className="w-full bg-pan-card border border-pan-border rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-pan-pink"
+              >
+                <option value="">— none —</option>
+                {webUsers.filter((u) => u.role === "CHANNEL_PARTNER").map((u) => (
+                  <option key={u.id} value={u.id}>{u.username}</option>
                 ))}
               </select>
             </div>

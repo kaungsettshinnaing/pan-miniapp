@@ -93,6 +93,9 @@ export async function POST(request: Request) {
       customerTelegramID: telegramID,
       totalCashback,
       customerMessage,
+      // App's own base URL so the (shared) n8n workflow calls back to the right
+      // environment (UAT vs prod) instead of a hardcoded host.
+      appBaseURL: process.env.NEXT_PUBLIC_APP_URL,
       sessionId: session.id,
     }).catch((e) => console.error("[earn] notify merchant failed:", e));
 
@@ -120,6 +123,7 @@ async function notifyMerchant(payload: {
   customerTelegramID: string;
   totalCashback: number;
   customerMessage: ResolvedMessage;
+  appBaseURL: string | undefined;
   sessionId: string;
 }) {
   const n8nUrl = await getSetting("N8N_WEBHOOK_URL");
