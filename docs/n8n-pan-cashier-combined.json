@@ -10,113 +10,21 @@
       },
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [-432, -608],
+      "position": [-800, 0],
       "id": "2c9f1a3f-bf8f-4d8d-bfb7-3c2b507b19be",
       "name": "Webhook",
       "webhookId": "1d27a919-10cb-493f-9afe-e7ada10ee3dc"
     },
     {
       "parameters": {
-        "operation": "sendAndWait",
-        "chatId": "={{ $json.body.merchantTelegramID }}",
-        "message": "=🔔 <b>New Cashback Customer</b>\n\n👤 <b>Customer:</b> {{ $json.body.customerName }}\n💰 <b>Balance:</b> Ks {{ $json.body.totalCashback }}\n\nAsk customer for their 4-digit PIN, then tap Redeem to process.",
-        "responseType": "customForm",
-        "formFields": {
-          "values": [
-            {
-              "fieldLabel": "4-digit PIN from customer",
-              "fieldType": "number",
-              "requiredField": true
-            },
-            {
-              "fieldLabel": "Amount",
-              "fieldType": "number",
-              "requiredField": true
-            },
-            {
-              "fieldLabel": "Note",
-              "fieldType": "textarea"
-            }
-          ]
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.telegram",
-      "typeVersion": 1.2,
-      "position": [-192, -608],
-      "id": "a4301253-8969-40bc-810c-7fb776c00861",
-      "name": "Notify Cashier",
-      "webhookId": "b79f3a23-72fe-4dd5-8f3d-84ffb98e6007",
-      "credentials": {
-        "telegramApi": {
-          "id": "1JWTAD3T5mQJSAtS",
-          "name": "PyanAnnNgwe_bot"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "https://uat.cashbackapp.cloud/api/redeem",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "x-api-secret",
-              "value": "REPLACE_WITH_API_SECRET"
-            }
-          ]
-        },
-        "sendBody": true,
-        "contentType": "json",
-        "bodyParameters": {
-          "parameters": [
-            {
-              "name": "otpCode",
-              "value": "={{ $json['4-digit PIN from customer'] }}"
-            },
-            {
-              "name": "purchaseAmount",
-              "value": "={{ $json['Amount'] }}"
-            },
-            {
-              "name": "merchantURL",
-              "value": "={{ $('Webhook').item.json.body.merchantURL }}"
-            }
-          ]
-        },
-        "options": {
-          "response": {
-            "response": {
-              "neverError": true
-            }
-          }
-        }
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [0, -608],
-      "id": "c1d28c49-72b3-4446-94ca-f96afdbe84cc",
-      "name": "Call Redeem API"
-    },
-    {
-      "parameters": {
         "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict",
-            "version": 1
-          },
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2 },
           "conditions": [
             {
-              "id": "check-ok",
-              "leftValue": "={{ $json.ok }}",
-              "rightValue": true,
-              "operator": {
-                "type": "boolean",
-                "operation": "equals"
-              }
+              "id": "earn-img-check",
+              "leftValue": "={{ $('Webhook').item.json.body.customerMessage.imageURL }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "notEmpty", "singleValue": true }
             }
           ],
           "combinator": "and"
@@ -125,7 +33,110 @@
       },
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [240, -608],
+      "position": [-580, 0],
+      "id": "b1111111-0000-4000-8000-000000000001",
+      "name": "Earn Has Image?"
+    },
+    {
+      "parameters": {
+        "operation": "sendPhoto",
+        "chatId": "={{ $('Webhook').item.json.body.customerTelegramID }}",
+        "file": "={{ $('Webhook').item.json.body.customerMessage.imageURL }}",
+        "additionalFields": {
+          "caption": "={{ $('Webhook').item.json.body.customerMessage.text }}"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [-360, -120],
+      "id": "b2222222-0000-4000-8000-000000000002",
+      "name": "Customer Earn (Photo)",
+      "credentials": { "telegramApi": { "id": "1JWTAD3T5mQJSAtS", "name": "PyanAnnNgwe_bot" } }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Webhook').item.json.body.customerTelegramID }}",
+        "text": "={{ $('Webhook').item.json.body.customerMessage.text }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [-360, 120],
+      "id": "b3333333-0000-4000-8000-000000000003",
+      "name": "Customer Earn (Text)",
+      "credentials": { "telegramApi": { "id": "1JWTAD3T5mQJSAtS", "name": "PyanAnnNgwe_bot" } }
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "chatId": "={{ $('Webhook').item.json.body.merchantTelegramID }}",
+        "message": "=🔔 <b>New Cashback Customer</b>\n\n👤 <b>Customer:</b> {{ $('Webhook').item.json.body.customerName }}\n💰 <b>Balance:</b> Ks {{ $('Webhook').item.json.body.totalCashback }}\n\nAsk the customer for their 4-digit PIN, then enter it with the purchase amount.",
+        "responseType": "customForm",
+        "formFields": {
+          "values": [
+            { "fieldLabel": "OTP", "fieldType": "number", "requiredField": true },
+            { "fieldLabel": "Amount", "fieldType": "number", "requiredField": true },
+            { "fieldLabel": "Note", "fieldType": "textarea" }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [-120, 0],
+      "id": "a4301253-8969-40bc-810c-7fb776c00861",
+      "name": "Notify Cashier",
+      "webhookId": "b79f3a23-72fe-4dd5-8f3d-84ffb98e6007",
+      "credentials": { "telegramApi": { "id": "1JWTAD3T5mQJSAtS", "name": "PyanAnnNgwe_bot" } }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://uat.cashbackapp.cloud/api/redeem",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-secret", "value": "REPLACE_WITH_API_SECRET" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "bodyParameters": {
+          "parameters": [
+            { "name": "otpCode", "value": "={{ $json.data.OTP }}" },
+            { "name": "purchaseAmount", "value": "={{ $json.data.Amount }}" },
+            { "name": "merchantURL", "value": "={{ $('Webhook').item.json.body.merchantURL }}" }
+          ]
+        },
+        "options": {
+          "response": { "response": { "neverError": true } }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [120, 0],
+      "id": "c1d28c49-72b3-4446-94ca-f96afdbe84cc",
+      "name": "Call Redeem API"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 1 },
+          "conditions": [
+            {
+              "id": "check-ok",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [360, 0],
       "id": "71de783c-6bc9-4bce-80f0-70d29a51861b",
       "name": "Success?"
     },
@@ -133,100 +144,120 @@
       "parameters": {
         "chatId": "={{ $('Webhook').item.json.body.merchantTelegramID }}",
         "text": "=✅ <b>Redemption Complete!</b>\n\n👤 {{ $('Call Redeem API').item.json.data.customerName }}\n🏷️ Redeemed: Ks {{ $('Call Redeem API').item.json.data.redeemedAmount }}\n💰 New Cashback: Ks {{ $('Call Redeem API').item.json.data.newCashbackAmt }}\n🧾 Purchase: Ks {{ $('Call Redeem API').item.json.data.purchaseAmount }}",
-        "additionalFields": {
-          "parse_mode": "HTML"
-        }
+        "additionalFields": { "parse_mode": "HTML" }
       },
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [480, -720],
+      "position": [600, -120],
       "id": "a756afd2-a77b-4f19-a114-5e05764e36ba",
-      "name": "Success Message",
-      "credentials": {
-        "telegramApi": {
-          "id": "1JWTAD3T5mQJSAtS",
-          "name": "PyanAnnNgwe_bot"
-        }
-      }
+      "name": "Cashier Success",
+      "credentials": { "telegramApi": { "id": "1JWTAD3T5mQJSAtS", "name": "PyanAnnNgwe_bot" } }
     },
     {
       "parameters": {
         "chatId": "={{ $('Webhook').item.json.body.merchantTelegramID }}",
-        "text": "=❌ <b>Redemption Failed</b>\n\n{{ $('Call Redeem API').item.json.error ?? 'Unknown error' }}\n\nPlease check the PIN and try again.",
+        "text": "=❌ <b>Redemption Failed</b>\n\n{{ $('Call Redeem API').item.json.error || 'Unknown error' }}\n\nPlease check the PIN and try again.",
+        "additionalFields": { "parse_mode": "HTML" }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [600, 120],
+      "id": "631bad90-b396-4c78-ba29-8eb0ce8eecf9",
+      "name": "Cashier Error",
+      "credentials": { "telegramApi": { "id": "1JWTAD3T5mQJSAtS", "name": "PyanAnnNgwe_bot" } }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2 },
+          "conditions": [
+            {
+              "id": "fail-img-check",
+              "leftValue": "={{ $('Call Redeem API').item.json.customerMessage?.imageURL }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "notEmpty", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [820, 120],
+      "id": "b4444444-0000-4000-8000-000000000004",
+      "name": "Fail Has Image?"
+    },
+    {
+      "parameters": {
+        "operation": "sendPhoto",
+        "chatId": "={{ $('Webhook').item.json.body.customerTelegramID }}",
+        "file": "={{ $('Call Redeem API').item.json.customerMessage.imageURL }}",
         "additionalFields": {
-          "parse_mode": "HTML"
+          "caption": "={{ $('Call Redeem API').item.json.customerMessage.text }}"
         }
       },
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [480, -480],
-      "id": "631bad90-b396-4c78-ba29-8eb0ce8eecf9",
-      "name": "Error Message",
-      "credentials": {
-        "telegramApi": {
-          "id": "1JWTAD3T5mQJSAtS",
-          "name": "PyanAnnNgwe_bot"
-        }
-      }
+      "position": [1040, 40],
+      "id": "b5555555-0000-4000-8000-000000000005",
+      "name": "Customer Fail (Photo)",
+      "credentials": { "telegramApi": { "id": "1JWTAD3T5mQJSAtS", "name": "PyanAnnNgwe_bot" } }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Webhook').item.json.body.customerTelegramID }}",
+        "text": "={{ $('Call Redeem API').item.json.customerMessage?.text || 'Your redemption could not be completed. Please try again.' }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1040, 200],
+      "id": "b6666666-0000-4000-8000-000000000006",
+      "name": "Customer Fail (Text)",
+      "credentials": { "telegramApi": { "id": "1JWTAD3T5mQJSAtS", "name": "PyanAnnNgwe_bot" } }
     }
   ],
   "pinData": {},
   "connections": {
     "Webhook": {
+      "main": [[{ "node": "Earn Has Image?", "type": "main", "index": 0 }]]
+    },
+    "Earn Has Image?": {
       "main": [
-        [
-          {
-            "node": "Notify Cashier",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        [{ "node": "Customer Earn (Photo)", "type": "main", "index": 0 }],
+        [{ "node": "Customer Earn (Text)", "type": "main", "index": 0 }]
       ]
+    },
+    "Customer Earn (Photo)": {
+      "main": [[{ "node": "Notify Cashier", "type": "main", "index": 0 }]]
+    },
+    "Customer Earn (Text)": {
+      "main": [[{ "node": "Notify Cashier", "type": "main", "index": 0 }]]
     },
     "Notify Cashier": {
-      "main": [
-        [
-          {
-            "node": "Call Redeem API",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Call Redeem API", "type": "main", "index": 0 }]]
     },
     "Call Redeem API": {
-      "main": [
-        [
-          {
-            "node": "Success?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Success?", "type": "main", "index": 0 }]]
     },
     "Success?": {
       "main": [
-        [
-          {
-            "node": "Success Message",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Error Message",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        [{ "node": "Cashier Success", "type": "main", "index": 0 }],
+        [{ "node": "Cashier Error", "type": "main", "index": 0 }]
+      ]
+    },
+    "Cashier Error": {
+      "main": [[{ "node": "Fail Has Image?", "type": "main", "index": 0 }]]
+    },
+    "Fail Has Image?": {
+      "main": [
+        [{ "node": "Customer Fail (Photo)", "type": "main", "index": 0 }],
+        [{ "node": "Customer Fail (Text)", "type": "main", "index": 0 }]
       ]
     }
   },
   "active": false,
-  "settings": {
-    "executionOrder": "v1"
-  },
+  "settings": { "executionOrder": "v1" },
   "tags": []
 }

@@ -1,0 +1,85 @@
+{
+  "name": "PAN - Customer Cashback Issued",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "pan-cashback-issued",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-600, 0],
+      "id": "c0000000-0000-4000-8000-000000000000",
+      "name": "Webhook",
+      "webhookId": "5e7a1c2d-4b6f-4a90-9c1e-2f3b4d5a6c70"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2 },
+          "conditions": [
+            {
+              "id": "success-img-check",
+              "leftValue": "={{ $('Webhook').item.json.body.customerMessage.imageURL }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "notEmpty", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [-380, 0],
+      "id": "c1111111-0000-4000-8000-000000000001",
+      "name": "Has Image?"
+    },
+    {
+      "parameters": {
+        "operation": "sendPhoto",
+        "chatId": "={{ $('Webhook').item.json.body.customerTelegramID }}",
+        "file": "={{ $('Webhook').item.json.body.customerMessage.imageURL }}",
+        "additionalFields": {
+          "caption": "={{ $('Webhook').item.json.body.customerMessage.text }}"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [-160, -120],
+      "id": "c2222222-0000-4000-8000-000000000002",
+      "name": "Customer Success (Photo)",
+      "credentials": { "telegramApi": { "id": "1JWTAD3T5mQJSAtS", "name": "PyanAnnNgwe_bot" } }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Webhook').item.json.body.customerTelegramID }}",
+        "text": "={{ $('Webhook').item.json.body.customerMessage.text }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [-160, 120],
+      "id": "c3333333-0000-4000-8000-000000000003",
+      "name": "Customer Success (Text)",
+      "credentials": { "telegramApi": { "id": "1JWTAD3T5mQJSAtS", "name": "PyanAnnNgwe_bot" } }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "Has Image?", "type": "main", "index": 0 }]]
+    },
+    "Has Image?": {
+      "main": [
+        [{ "node": "Customer Success (Photo)", "type": "main", "index": 0 }],
+        [{ "node": "Customer Success (Text)", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "tags": []
+}

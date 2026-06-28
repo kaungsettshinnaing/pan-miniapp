@@ -115,14 +115,24 @@ networks:
 
 ## n8n Integration
 
-n8n fires on two events (fire-and-forget POST after successful DB transaction):
+**The backend is the single source of truth for customer-facing messages.** It resolves each merchant's `MessageTemplate` (via `lib/messages.ts` → `resolveMerchantMessage`), substitutes `{{variables}}`, and ships n8n a ready-to-send `customerMessage: { text, imageURL }`. n8n only forwards it to Telegram (`sendPhoto` with caption when `imageURL` is set, else `sendMessage`) — it does no DB work and no template logic. This keeps the customer's message identical whether the flow started in the mini-app or by texting the bot, and whether the cashier redeemed via the n8n form or the in-app merchant tab.
+
+n8n fires on two events (fire-and-forget POST):
 
 | Trigger | Webhook path | Payload |
 |---------|-------------|---------|
-| Customer earns cashback (OTP generated) | `/pan-merchant-notify` | `{ customerTelegramID, merchantURL, totalCashback, otpCode, merchantTelegramID }` |
-| Redemption processed | `/pan-cashback-issued` | `{ customerTelegramID, merchantURL, redeemedAmt, newCashbackAmt, expiryDate, purchaseAmount }` |
+| Customer earns (OTP generated) | `/pan-merchant-notify` | `{ merchantTelegramID, merchantURL, customerName, customerTelegramID, totalCashback, customerMessage: { text, imageURL }, sessionId }` |
+| Redemption success | `/pan-cashback-issued` | `{ event, customerTelegramID, merchantURL, merchantName, purchaseAmount, redeemedAmount, netPurchase, newCashbackAmt, expiryDate, commissionEarned, customerMessage: { text, imageURL } }` |
+
+The **redemption-failure** customer message is not a webhook — it rides back in the `/api/redeem` **error response** (`{ ok:false, error, customerMessage }`), because an invalid OTP can't be identified server-side; the combined n8n workflow (which still holds the earn-context chatId) forwards it.
 
 The base URL is read from `PlatformSetting` key `N8N_WEBHOOK_URL` (DB-backed, editable in admin panel without redeploy).
+
+### Workflows (`docs/`)
+- `n8n-pan-cashier-combined.json` — triggered by `pan-merchant-notify`: sends the customer earn message → `sendAndWait` cashier form → calls `/api/redeem` → cashier success/error message, and on failure forwards the customer failure message. (Customer **success** is NOT sent here — the backend fires it, see below, to avoid double-send.)
+- `n8n-pan-cashback-issued.json` — triggered by `pan-cashback-issued`: sends the customer success message. Backend-fired so it works for every redeem entry point.
+
+Both reference the `PyanAnnNgwe_bot` Telegram credential; the combined workflow's `Call Redeem API` node needs the `x-api-secret` header value set to `API_SECRET`.
 
 ---
 

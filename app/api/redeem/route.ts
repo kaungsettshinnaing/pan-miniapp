@@ -2,6 +2,8 @@ import { requireMerchantAccess } from "@/lib/web-auth";
 import { prisma } from "@/lib/prisma";
 import { getSetting } from "@/lib/settings";
 import { ok, err } from "@/lib/api-response";
+import { resolveMerchantMessage } from "@/lib/messages";
+import { formatKs, formatDate } from "@/lib/templates";
 
 export async function POST(request: Request) {
   try {
@@ -42,7 +44,17 @@ export async function POST(request: Request) {
         customer: { select: { customerTelegramID: true, firstName: true } },
       },
     });
-    if (!otp) return err("Invalid or expired PIN", 400);
+    if (!otp) {
+      // Invalid OTP can't identify the customer, but the n8n combined workflow
+      // still holds the earn-context chatId, so hand it the resolved failure
+      // message to forward to the customer.
+      const customerMessage = await resolveMerchantMessage(
+        merchant.merchantURL,
+        "REDEMPTION_FAILURE",
+        { merchantName: merchant.merchantName }
+      );
+      return err("Invalid or expired PIN", 400, { customerMessage });
+    }
 
     // Authorize: OTP must be for a merchant the caller can access (same outlet or same group)
     if (!merchantURLs.includes(otp.merchantURL)) {
@@ -156,6 +168,22 @@ export async function POST(request: Request) {
       });
     });
 
+    // Resolve the customer's branded success message. Fired by the backend (not n8n)
+    // so the customer is notified no matter which path the cashier used to redeem
+    // (n8n Telegram form OR the in-app merchant tab).
+    const customerName = otp.customer.firstName ?? "Customer";
+    const customerMessage = await resolveMerchantMessage(
+      merchant.merchantURL,
+      "CASHBACK_ISSUED_WITH_REDEMPTION",
+      {
+        cashbackAmt: formatKs(newCashbackAmt),
+        purchaseAmount: formatKs(purchaseAmount),
+        expiryDate: formatDate(expiryDate),
+        merchantName: merchant.merchantName,
+        customerName,
+      }
+    );
+
     // Fire-and-forget → n8n sends Telegram messages to customer
     const n8nUrl = await getSetting("N8N_WEBHOOK_URL");
     if (n8nUrl) {
@@ -173,6 +201,7 @@ export async function POST(request: Request) {
           newCashbackAmt,
           expiryDate: newCashbackAmt > 0 ? expiryDate.toISOString() : null,
           commissionEarned,
+          customerMessage,
         }),
       }).catch(() => {});
     }
@@ -183,7 +212,7 @@ export async function POST(request: Request) {
       newCashbackAmt,
       purchaseAmount,
       merchantName: merchant.merchantName,
-      customerName: otp.customer.firstName ?? "Customer",
+      customerName,
       expiryDate: newCashbackAmt > 0 ? expiryDate.toISOString() : null,
     });
   } catch (e) {

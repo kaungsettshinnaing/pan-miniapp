@@ -2,6 +2,8 @@ import { parseTelegramUser } from "@/lib/telegram-auth";
 import { prisma } from "@/lib/prisma";
 import { getSetting } from "@/lib/settings";
 import { ok, err } from "@/lib/api-response";
+import { resolveMerchantMessage, type ResolvedMessage } from "@/lib/messages";
+import { formatKs } from "@/lib/templates";
 
 // POST /api/earn — customer enters merchant code, gets OTP
 export async function POST(request: Request) {
@@ -72,13 +74,25 @@ export async function POST(request: Request) {
       },
     });
 
+    const customerName = [user.first_name, user.last_name].filter(Boolean).join(" ");
+
+    // Backend resolves the customer's branded message (image + text + PIN) so it's
+    // identical whether the customer started in the mini-app or by texting the bot.
+    const customerMessage = await resolveMerchantMessage(merchantURL, "CASHBACK_ISSUED", {
+      pin: otpCode,
+      cashbackAmt: formatKs(totalCashback),
+      merchantName: merchant.merchantName,
+      customerName,
+    });
+
     // Notify merchant via n8n webhook (fire-and-forget)
     notifyMerchant({
       merchantTelegramID: merchant.merchantTelegramID,
       merchantURL,
-      customerName: [user.first_name, user.last_name].filter(Boolean).join(" "),
+      customerName,
+      customerTelegramID: telegramID,
       totalCashback,
-      otpCode,
+      customerMessage,
       sessionId: session.id,
     }).catch((e) => console.error("[earn] notify merchant failed:", e));
 
@@ -103,8 +117,9 @@ async function notifyMerchant(payload: {
   merchantTelegramID: string;
   merchantURL: string;
   customerName: string;
+  customerTelegramID: string;
   totalCashback: number;
-  otpCode: string;
+  customerMessage: ResolvedMessage;
   sessionId: string;
 }) {
   const n8nUrl = await getSetting("N8N_WEBHOOK_URL");
