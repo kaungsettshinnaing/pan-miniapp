@@ -28,7 +28,9 @@ const DEFAULTS: Partial<Record<MessageTriggerKey, string>> = {
     "⚠️ Your redemption at {{merchantName}} could not be completed. Please try again or ask the cashier for help.",
 };
 
-export type ResolvedMessage = { text: string; imageURL: string | null };
+// `trigger` is echoed back so n8n (and anyone reading the webhook body) can see
+// which template produced this message at a glance.
+export type ResolvedMessage = { trigger: MessageTriggerKey; text: string; imageURL: string | null };
 
 export async function resolveMerchantMessage(
   merchantURL: string,
@@ -46,6 +48,7 @@ export async function resolveMerchantMessage(
   });
   const raw = template?.messageText ?? DEFAULTS[trigger] ?? "";
   return {
+    trigger,
     text: renderTemplate(raw, vars),
     imageURL: template?.imageURL ?? null,
   };

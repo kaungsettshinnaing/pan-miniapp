@@ -190,9 +190,9 @@ updatedAt   DateTime       @updatedAt
 | `FIRST_RECALL_CAMPAIGN` | N days since last visit (firstRecallCampaignDays) |
 | `SECOND_RECALL_CAMPAIGN` | N days since last visit (secondRecallCampaignDays) |
 
-**Template variables:** `{{cashbackAmt}}` `{{expiryDate}}` `{{merchantName}}` `{{purchaseAmount}}` `{{customerName}}` `{{reminderDays}}`
+**Template variables:** `{{pin}}` (CASHBACK_ISSUED only) `{{cashbackAmt}}` `{{expiryDate}}` `{{merchantName}}` `{{purchaseAmount}}` `{{customerName}}` `{{reminderDays}}`
 
-If a merchant has no custom template for a trigger, n8n uses its own default message.
+Backend-resolved messages (`lib/messages.ts` → `resolveMerchantMessage`) return `{ trigger, text, imageURL }` — the `trigger` name is echoed into the webhook/redeem payload so n8n shows which template produced the message. If a merchant has no custom `messageText`, the backend default for that trigger is used.
 
 ---
 

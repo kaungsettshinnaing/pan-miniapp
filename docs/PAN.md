@@ -115,14 +115,14 @@ networks:
 
 ## n8n Integration
 
-**The backend is the single source of truth for customer-facing messages.** It resolves each merchant's `MessageTemplate` (via `lib/messages.ts` → `resolveMerchantMessage`), substitutes `{{variables}}`, and ships n8n a ready-to-send `customerMessage: { text, imageURL }`. n8n only forwards it to Telegram (`sendPhoto` with caption when `imageURL` is set, else `sendMessage`) — it does no DB work and no template logic. This keeps the customer's message identical whether the flow started in the mini-app or by texting the bot, and whether the cashier redeemed via the n8n form or the in-app merchant tab.
+**The backend is the single source of truth for customer-facing messages.** It resolves each merchant's `MessageTemplate` (via `lib/messages.ts` → `resolveMerchantMessage`), substitutes `{{variables}}`, and ships n8n a ready-to-send `customerMessage: { trigger, text, imageURL }`. n8n only forwards it to Telegram (`sendPhoto` with caption when `imageURL` is set, else `sendMessage`) — it does no DB work and no template logic. This keeps the customer's message identical whether the flow started in the mini-app or by texting the bot, and whether the cashier redeemed via the n8n form or the in-app merchant tab.
 
 n8n fires on two events (fire-and-forget POST):
 
 | Trigger | Webhook path | Payload |
 |---------|-------------|---------|
-| Customer earns (OTP generated) | `/pan-merchant-notify` | `{ merchantTelegramID, merchantURL, customerName, customerTelegramID, totalCashback, customerMessage: { text, imageURL }, sessionId }` |
-| Redemption success | `/pan-cashback-issued` | `{ event, customerTelegramID, merchantURL, merchantName, purchaseAmount, redeemedAmount, netPurchase, newCashbackAmt, expiryDate, commissionEarned, customerMessage: { text, imageURL } }` |
+| Customer earns (OTP generated) | `/pan-merchant-notify` | `{ merchantTelegramID, merchantURL, customerName, customerTelegramID, totalCashback, appBaseURL, customerMessage: { trigger, text, imageURL }, sessionId }` |
+| Redemption success | `/pan-cashback-issued` | `{ event, customerTelegramID, merchantURL, merchantName, purchaseAmount, redeemedAmount, netPurchase, newCashbackAmt, expiryDate, commissionEarned, customerMessage: { trigger, text, imageURL } }` |
 
 The **redemption-failure** customer message is not a webhook — it rides back in the `/api/redeem` **error response** (`{ ok:false, error, customerMessage }`), because an invalid OTP can't be identified server-side; the combined n8n workflow (which still holds the earn-context chatId) forwards it.
 

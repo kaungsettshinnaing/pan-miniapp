@@ -19,7 +19,9 @@ const TRIGGER_LABELS: Record<string, string> = {
   SECOND_RECALL_CAMPAIGN: "📣 Win-back Campaign #2",
 };
 
-const VARIABLES = ["{{cashbackAmt}}", "{{expiryDate}}", "{{merchantName}}", "{{purchaseAmount}}", "{{customerName}}", "{{reminderDays}}"];
+// {{pin}} only renders for the "Cashback Issued" message (the earn/PIN message);
+// the others render wherever their data is available for that trigger.
+const VARIABLES = ["{{pin}}", "{{cashbackAmt}}", "{{expiryDate}}", "{{merchantName}}", "{{purchaseAmount}}", "{{customerName}}", "{{reminderDays}}"];
 
 type Props = {
   apiFetch: <T>(path: string, opts?: RequestInit) => Promise<T>;
