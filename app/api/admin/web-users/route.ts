@@ -3,13 +3,16 @@ import { requireAdmin } from "@/lib/web-auth";
 import { prisma } from "@/lib/prisma";
 import { ok, err } from "@/lib/api-response";
 
+const SELECT = {
+  id: true, username: true, role: true,
+  merchantURL: true, redemptionGroupID: true, profitSharePct: true,
+  createdAt: true,
+} as const;
+
 export async function GET(request: Request) {
   try {
     await requireAdmin(request);
-    const users = await prisma.webUser.findMany({
-      orderBy: { username: "asc" },
-      select: { id: true, username: true, role: true, merchantURL: true, createdAt: true },
-    });
+    const users = await prisma.webUser.findMany({ orderBy: { username: "asc" }, select: SELECT });
     return ok(users);
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Error";
@@ -20,18 +23,27 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     await requireAdmin(request);
-    const body = (await request.json()) as { username?: string; password?: string; role?: string; merchantURL?: string | null };
+    const body = (await request.json()) as {
+      username?: string; password?: string; role?: string;
+      merchantURL?: string | null; redemptionGroupID?: string | null; profitSharePct?: number | null;
+    };
     if (!body.username || !body.password || !body.role) return err("username, password, and role are required", 400);
-    if (!["ADMIN", "MERCHANT"].includes(body.role)) return err("role must be ADMIN or MERCHANT", 400);
-    if (body.role === "MERCHANT" && !body.merchantURL) return err("merchantURL is required for MERCHANT role", 400);
+    if (!["ADMIN", "MERCHANT", "CHANNEL_PARTNER"].includes(body.role)) return err("invalid role", 400);
 
     const exists = await prisma.webUser.findUnique({ where: { username: body.username } });
     if (exists) return err("username already taken", 409);
 
     const passwordHash = await bcrypt.hash(body.password, 12);
     const user = await prisma.webUser.create({
-      data: { username: body.username, passwordHash, role: body.role as never, merchantURL: body.merchantURL ?? null },
-      select: { id: true, username: true, role: true, merchantURL: true, createdAt: true },
+      data: {
+        username: body.username,
+        passwordHash,
+        role: body.role as never,
+        merchantURL: body.merchantURL ?? null,
+        redemptionGroupID: body.redemptionGroupID ?? null,
+        profitSharePct: body.profitSharePct ?? null,
+      },
+      select: SELECT,
     });
     return ok(user);
   } catch (e) {
@@ -43,10 +55,12 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   try {
     await requireAdmin(request);
-    const body = (await request.json()) as { id?: string; password?: string };
-    if (!body.id || !body.password) return err("id and password are required", 400);
-    const passwordHash = await bcrypt.hash(body.password, 12);
-    await prisma.webUser.update({ where: { id: body.id }, data: { passwordHash } });
+    const body = (await request.json()) as { id?: string; password?: string; profitSharePct?: number | null };
+    if (!body.id) return err("id is required", 400);
+    const data: Record<string, unknown> = {};
+    if (body.password) data.passwordHash = await bcrypt.hash(body.password, 12);
+    if (body.profitSharePct !== undefined) data.profitSharePct = body.profitSharePct;
+    await prisma.webUser.update({ where: { id: body.id }, data });
     return ok({ updated: true });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Error";

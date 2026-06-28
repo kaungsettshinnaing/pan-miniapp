@@ -6,11 +6,15 @@ import { apiFetch } from "@/app/page";
 
 type Setting = { key: string; value: string };
 
+type RedemptionGroup = { id: string; groupName: string };
+
 type WebUser = {
   id: string;
   username: string;
-  role: "ADMIN" | "MERCHANT";
+  role: "ADMIN" | "MERCHANT" | "CHANNEL_PARTNER";
   merchantURL: string | null;
+  redemptionGroupID: string | null;
+  profitSharePct: number | null;
   createdAt: string;
 };
 
@@ -43,15 +47,16 @@ export default function AdminPage() {
   const [settings, setSettings] = useState<Setting[]>([]);
   const [merchants, setMerchants] = useState<Merchant[]>([]);
   const [webUsers, setWebUsers] = useState<WebUser[]>([]);
+  const [redemptionGroups, setRedemptionGroups] = useState<RedemptionGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState<string | null>(null);
   const [editMerchant, setEditMerchant] = useState<Merchant | null>(null);
   const [merchantSaving, setMerchantSaving] = useState(false);
-  const [newUser, setNewUser] = useState<{ username: string; password: string; role: "ADMIN" | "MERCHANT"; merchantURL: string } | null>(null);
+  const [newUser, setNewUser] = useState<{ username: string; password: string; role: "ADMIN" | "MERCHANT" | "CHANNEL_PARTNER"; merchantURL: string; redemptionGroupID: string; profitSharePct: string } | null>(null);
   const [newUserSaving, setNewUserSaving] = useState(false);
-  const [resetUser, setResetUser] = useState<{ id: string; username: string; password: string } | null>(null);
+  const [resetUser, setResetUser] = useState<{ id: string; username: string; role: string; password: string; profitSharePct: string } | null>(null);
 
   useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -64,14 +69,16 @@ export default function AdminPage() {
     setLoading(true);
     setError(null);
     try {
-      const [s, m, u] = await Promise.all([
+      const [s, m, u, g] = await Promise.all([
         apiFetch<Setting[]>("/api/admin/settings"),
         apiFetch<Merchant[]>("/api/admin/merchants"),
         apiFetch<WebUser[]>("/api/admin/web-users"),
+        apiFetch<RedemptionGroup[]>("/api/admin/groups"),
       ]);
       setSettings(s);
       setMerchants(m);
       setWebUsers(u);
+      setRedemptionGroups(g);
       const map: Record<string, string> = {};
       s.forEach((r) => { map[r.key] = r.value; });
       setEditing(map);
@@ -101,7 +108,17 @@ export default function AdminPage() {
     if (!newUser) return;
     setNewUserSaving(true);
     try {
-      await apiFetch("/api/admin/web-users", { method: "POST", body: JSON.stringify(newUser) });
+      await apiFetch("/api/admin/web-users", {
+        method: "POST",
+        body: JSON.stringify({
+          username: newUser.username,
+          password: newUser.password,
+          role: newUser.role,
+          merchantURL: newUser.role === "MERCHANT" && !newUser.redemptionGroupID ? newUser.merchantURL || null : null,
+          redemptionGroupID: newUser.role === "MERCHANT" && newUser.redemptionGroupID ? newUser.redemptionGroupID : null,
+          profitSharePct: newUser.role === "CHANNEL_PARTNER" && newUser.profitSharePct ? Number(newUser.profitSharePct) : null,
+        }),
+      });
       setNewUser(null);
       await load();
     } catch (e) {
@@ -115,8 +132,16 @@ export default function AdminPage() {
     if (!resetUser) return;
     setNewUserSaving(true);
     try {
-      await apiFetch("/api/admin/web-users", { method: "PATCH", body: JSON.stringify({ id: resetUser.id, password: resetUser.password }) });
+      await apiFetch("/api/admin/web-users", {
+        method: "PATCH",
+        body: JSON.stringify({
+          id: resetUser.id,
+          ...(resetUser.password ? { password: resetUser.password } : {}),
+          ...(resetUser.role === "CHANNEL_PARTNER" ? { profitSharePct: resetUser.profitSharePct ? Number(resetUser.profitSharePct) : null } : {}),
+        }),
+      });
       setResetUser(null);
+      await load();
     } catch (e) {
       alert(e instanceof Error ? e.message : "Failed");
     } finally {
@@ -265,7 +290,7 @@ export default function AdminPage() {
       {tab === "users" && (
         <div className="space-y-3">
           <button
-            onClick={() => setNewUser({ username: "", password: "", role: "MERCHANT", merchantURL: "" })}
+            onClick={() => setNewUser({ username: "", password: "", role: "MERCHANT", merchantURL: "", redemptionGroupID: "", profitSharePct: "" })}
             className="w-full rounded-xl py-3 text-sm font-bold text-white cursor-pointer"
             style={{ background: "linear-gradient(135deg,#f0206a,#c01253)" }}
           >
@@ -278,11 +303,16 @@ export default function AdminPage() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-white font-bold text-sm">{u.username}</p>
-                <p className="text-pan-muted text-xs">{u.role}{u.merchantURL ? ` · ${u.merchantURL}` : ""}</p>
+                <p className="text-pan-muted text-xs">
+                  {u.role}
+                  {u.merchantURL ? ` · ${u.merchantURL}` : ""}
+                  {u.redemptionGroupID ? ` · group` : ""}
+                  {u.profitSharePct != null ? ` · ${u.profitSharePct}% share` : ""}
+                </p>
               </div>
               <div className="flex gap-2">
                 <button
-                  onClick={() => setResetUser({ id: u.id, username: u.username, password: "" })}
+                  onClick={() => setResetUser({ id: u.id, username: u.username, role: u.role, password: "", profitSharePct: String(u.profitSharePct ?? "") })}
                   className="text-pan-muted text-xs border border-pan-border rounded-lg px-2 py-1 cursor-pointer"
                 >
                   Reset
@@ -326,32 +356,62 @@ export default function AdminPage() {
             ))}
             <div className="mb-4">
               <p className="text-pan-muted text-xs uppercase tracking-widest font-bold mb-1">Role</p>
-              <div className="flex gap-2">
-                {(["ADMIN", "MERCHANT"] as const).map((r) => (
+              <div className="flex gap-2 flex-wrap">
+                {(["ADMIN", "MERCHANT", "CHANNEL_PARTNER"] as const).map((r) => (
                   <button
                     key={r}
                     onClick={() => setNewUser({ ...newUser, role: r })}
-                    className="flex-1 py-2 rounded-lg text-sm font-bold cursor-pointer transition-colors"
+                    className="flex-1 py-2 rounded-lg text-xs font-bold cursor-pointer transition-colors whitespace-nowrap"
                     style={newUser.role === r ? { background: "#f0206a", color: "#fff" } : { background: "#1e2d5a", color: "#6b7fb0" }}
                   >
-                    {r}
+                    {r === "CHANNEL_PARTNER" ? "Channel Partner" : r}
                   </button>
                 ))}
               </div>
             </div>
+
             {newUser.role === "MERCHANT" && (
+              <>
+                <div className="mb-3">
+                  <p className="text-pan-muted text-xs uppercase tracking-widest font-bold mb-1">Single Outlet</p>
+                  <select
+                    value={newUser.merchantURL}
+                    onChange={(e) => setNewUser({ ...newUser, merchantURL: e.target.value, redemptionGroupID: "" })}
+                    className="w-full bg-pan-card border border-pan-border rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-pan-pink"
+                  >
+                    <option value="">— select merchant —</option>
+                    {merchants.map((m) => (
+                      <option key={m.merchantURL} value={m.merchantURL}>{m.merchantName} ({m.merchantURL})</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="mb-4">
+                  <p className="text-pan-muted text-xs uppercase tracking-widest font-bold mb-1">OR Redemption Group (group owner)</p>
+                  <select
+                    value={newUser.redemptionGroupID}
+                    onChange={(e) => setNewUser({ ...newUser, redemptionGroupID: e.target.value, merchantURL: "" })}
+                    className="w-full bg-pan-card border border-pan-border rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-pan-pink"
+                  >
+                    <option value="">— select group —</option>
+                    {redemptionGroups.map((g) => (
+                      <option key={g.id} value={g.id}>{g.groupName}</option>
+                    ))}
+                  </select>
+                </div>
+              </>
+            )}
+
+            {newUser.role === "CHANNEL_PARTNER" && (
               <div className="mb-4">
-                <p className="text-pan-muted text-xs uppercase tracking-widest font-bold mb-1">Merchant URL</p>
-                <select
-                  value={newUser.merchantURL}
-                  onChange={(e) => setNewUser({ ...newUser, merchantURL: e.target.value })}
+                <p className="text-pan-muted text-xs uppercase tracking-widest font-bold mb-1">Profit Share %</p>
+                <input
+                  type="number"
+                  min="0" max="100" step="0.1"
+                  value={newUser.profitSharePct}
+                  onChange={(e) => setNewUser({ ...newUser, profitSharePct: e.target.value })}
+                  placeholder="e.g. 20 for 20%"
                   className="w-full bg-pan-card border border-pan-border rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-pan-pink"
-                >
-                  <option value="">— select merchant —</option>
-                  {merchants.map((m) => (
-                    <option key={m.merchantURL} value={m.merchantURL}>{m.merchantName} ({m.merchantURL})</option>
-                  ))}
-                </select>
+                />
               </div>
             )}
             <div className="flex gap-3">
@@ -376,8 +436,8 @@ export default function AdminPage() {
           <div className="fixed bottom-0 left-0 right-0 z-50 max-w-[480px] mx-auto rounded-t-2xl bg-pan-overlay px-5 pt-4 pb-10 shadow-2xl">
             <div className="mx-auto mb-4 w-10 h-1 rounded-full bg-pan-border" />
             <h2 className="text-lg font-bold text-white mb-1">Reset Password</h2>
-            <p className="text-pan-muted text-sm mb-4">{resetUser.username}</p>
-            <p className="text-pan-muted text-xs uppercase tracking-widest font-bold mb-1">New Password</p>
+            <p className="text-pan-muted text-sm mb-4">{resetUser.username} · {resetUser.role}</p>
+            <p className="text-pan-muted text-xs uppercase tracking-widest font-bold mb-1">New Password (leave blank to keep)</p>
             <input
               type="password"
               value={resetUser.password}
@@ -385,15 +445,27 @@ export default function AdminPage() {
               placeholder="Enter new password"
               className="w-full bg-pan-card border border-pan-border rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-pan-pink mb-4"
             />
+            {resetUser.role === "CHANNEL_PARTNER" && (
+              <div className="mb-4">
+                <p className="text-pan-muted text-xs uppercase tracking-widest font-bold mb-1">Profit Share %</p>
+                <input
+                  type="number" min="0" max="100" step="0.1"
+                  value={resetUser.profitSharePct}
+                  onChange={(e) => setResetUser({ ...resetUser, profitSharePct: e.target.value })}
+                  placeholder="e.g. 20"
+                  className="w-full bg-pan-card border border-pan-border rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-pan-pink"
+                />
+              </div>
+            )}
             <div className="flex gap-3">
               <button onClick={() => setResetUser(null)} className="flex-1 rounded-xl py-3 text-sm font-bold text-pan-muted border border-pan-border cursor-pointer">Cancel</button>
               <button
                 onClick={resetPassword}
-                disabled={newUserSaving || !resetUser.password}
+                disabled={newUserSaving}
                 className="flex-1 rounded-xl py-3 text-sm font-bold text-white disabled:opacity-40 cursor-pointer"
                 style={{ background: "linear-gradient(135deg,#f0206a,#c01253)" }}
               >
-                {newUserSaving ? "Saving…" : "Reset"}
+                {newUserSaving ? "Saving…" : "Save"}
               </button>
             </div>
           </div>

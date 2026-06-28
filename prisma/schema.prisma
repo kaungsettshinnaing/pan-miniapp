@@ -18,6 +18,7 @@ model RedemptionGroup {
   groupName   String
   description String?
   merchants   Merchant[]
+  webUsers    WebUser[]
   createdAt   DateTime   @default(now())
 }
 
@@ -45,7 +46,9 @@ model Merchant {
   otpSessions              OtpSession[]
   messageTemplates         MessageTemplate[]
   billing                  MonthlyBilling[]
-  webUsers                 WebUser[]
+  webUsers                 WebUser[]        @relation("MerchantLogin")
+  channelPartnerID         String?
+  channelPartner           WebUser?         @relation("ChannelPartnerMerchants", fields: [channelPartnerID], references: [id])
   createdAt                DateTime         @default(now())
   updatedAt                DateTime         @updatedAt
 }
@@ -137,19 +140,24 @@ model MonthlyBilling {
 }
 
 model WebUser {
-  id           String      @id @default(cuid())
-  username     String      @unique
-  passwordHash String
-  role         WebUserRole
-  merchantURL  String?
-  merchant     Merchant?   @relation(fields: [merchantURL], references: [merchantURL])
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  id                String           @id @default(cuid())
+  username          String           @unique
+  passwordHash      String
+  role              WebUserRole
+  merchantURL       String?          // MERCHANT — single outlet
+  merchant          Merchant?        @relation("MerchantLogin", fields: [merchantURL], references: [merchantURL])
+  redemptionGroupID String?          // MERCHANT — group owner (sees all outlets in group)
+  redemptionGroup   RedemptionGroup? @relation(fields: [redemptionGroupID], references: [id])
+  profitSharePct    Float?           // CHANNEL_PARTNER — % of commission, set by admin
+  managedMerchants  Merchant[]       @relation("ChannelPartnerMerchants")
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
 }
 
 enum WebUserRole {
   ADMIN
   MERCHANT
+  CHANNEL_PARTNER
 }
 
 enum EarnType {

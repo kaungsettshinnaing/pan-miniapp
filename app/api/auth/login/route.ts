@@ -16,14 +16,21 @@ export async function POST(request: Request) {
 
     const token = await signSession({
       sub: user.id,
-      role: user.role as "ADMIN" | "MERCHANT",
-      merchantURL: user.merchantURL,
+      role: user.role as "ADMIN" | "MERCHANT" | "CHANNEL_PARTNER",
       username: user.username,
+      merchantURL: user.merchantURL,
+      redemptionGroupID: user.redemptionGroupID,
+      profitSharePct: user.profitSharePct,
     });
 
     await setSessionCookie(token);
 
-    return ok({ role: user.role, merchantURL: user.merchantURL, username: user.username });
+    return ok({
+      role: user.role,
+      merchantURL: user.merchantURL,
+      redemptionGroupID: user.redemptionGroupID,
+      username: user.username,
+    });
   } catch (e) {
     console.error("[auth/login]", e);
     return err("Internal error", 500);

@@ -13,12 +13,17 @@ function secret() {
   return new TextEncoder().encode(s);
 }
 
-export async function signSession(payload: {
+// ── JWT ───────────────────────────────────────────────────────────────────────
+export type SessionPayload = {
   sub: string;
-  role: "ADMIN" | "MERCHANT";
-  merchantURL: string | null;
+  role: "ADMIN" | "MERCHANT" | "CHANNEL_PARTNER";
   username: string;
-}) {
+  merchantURL: string | null;
+  redemptionGroupID: string | null;
+  profitSharePct: number | null;
+};
+
+export async function signSession(payload: SessionPayload) {
   return new SignJWT(payload as Record<string, unknown>)
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
@@ -26,15 +31,10 @@ export async function signSession(payload: {
     .sign(secret());
 }
 
-async function verifySession(token: string) {
+async function verifySession(token: string): Promise<SessionPayload | null> {
   try {
     const { payload } = await jwtVerify(token, secret());
-    return payload as {
-      sub: string;
-      role: "ADMIN" | "MERCHANT";
-      merchantURL: string | null;
-      username: string;
-    };
+    return payload as unknown as SessionPayload;
   } catch {
     return null;
   }
@@ -62,10 +62,18 @@ export async function clearSessionCookie() {
   store.delete(COOKIE);
 }
 
-// ── Unified auth result ───────────────────────────────────────────────────────
+// ── Auth result ───────────────────────────────────────────────────────────────
 export type AuthUser =
   | { source: "telegram"; telegramID: string; firstName?: string }
-  | { source: "web"; id: string; role: "ADMIN" | "MERCHANT"; merchantURL: string | null; username: string };
+  | {
+      source: "web";
+      id: string;
+      role: "ADMIN" | "MERCHANT" | "CHANNEL_PARTNER";
+      username: string;
+      merchantURL: string | null;
+      redemptionGroupID: string | null;
+      profitSharePct: number | null;
+    };
 
 export async function getAuth(request: Request): Promise<AuthUser | null> {
   // 1. Try Telegram initData
@@ -75,23 +83,31 @@ export async function getAuth(request: Request): Promise<AuthUser | null> {
       const parsed = parseTelegramUser(request, process.env.TELEGRAM_BOT_TOKEN!);
       return { source: "telegram", telegramID: String(parsed.user.id), firstName: parsed.user.first_name };
     } catch {
-      // empty or invalid initData — fall through to cookie
+      // empty / invalid — fall through to cookie
     }
   }
 
-  // 2. Try cookie JWT
+  // 2. Try httpOnly cookie
   const token = parseCookie(request.headers.get("cookie"), COOKIE);
   if (token) {
-    const payload = await verifySession(token);
-    if (payload) {
-      return { source: "web", id: payload.sub, role: payload.role, merchantURL: payload.merchantURL, username: payload.username };
+    const p = await verifySession(token);
+    if (p) {
+      return {
+        source: "web",
+        id: p.sub,
+        role: p.role,
+        username: p.username,
+        merchantURL: p.merchantURL,
+        redemptionGroupID: p.redemptionGroupID,
+        profitSharePct: p.profitSharePct,
+      };
     }
   }
 
   return null;
 }
 
-// ── Role helpers ──────────────────────────────────────────────────────────────
+// ── Role guards ───────────────────────────────────────────────────────────────
 export async function requireAdmin(request: Request): Promise<AuthUser> {
   const auth = await getAuth(request);
   if (!auth) throw new Error("Unauthorized");
@@ -100,19 +116,63 @@ export async function requireAdmin(request: Request): Promise<AuthUser> {
   return auth;
 }
 
-export async function requireMerchantURL(request: Request): Promise<{ auth: AuthUser; merchantURL: string }> {
+export async function requireChannelPartner(request: Request): Promise<{ auth: AuthUser; cpId: string }> {
+  const auth = await getAuth(request);
+  if (!auth) throw new Error("Unauthorized");
+  if (auth.source !== "web" || auth.role !== "CHANNEL_PARTNER") throw new Error("Forbidden");
+  return { auth, cpId: auth.id };
+}
+
+// Returns every merchantURL the authenticated merchant user can access.
+// Telegram → their outlet only.
+// Web MERCHANT + merchantURL → single outlet.
+// Web MERCHANT + redemptionGroupID → all outlets in the group.
+export async function requireMerchantAccess(request: Request): Promise<{
+  auth: AuthUser;
+  merchantURLs: string[];
+  merchantURL: string;   // primary for single-outlet operations
+}> {
   const auth = await getAuth(request);
   if (!auth) throw new Error("Unauthorized");
 
   if (auth.source === "telegram") {
     const m = await prisma.merchant.findFirst({
       where: { merchantTelegramID: auth.telegramID, active: true },
-      select: { merchantURL: true },
+      select: { merchantURL: true, redemptionGroupID: true },
     });
     if (!m) throw new Error("Forbidden");
-    return { auth, merchantURL: m.merchantURL };
+
+    if (m.redemptionGroupID) {
+      const group = await prisma.merchant.findMany({
+        where: { redemptionGroupID: m.redemptionGroupID, active: true },
+        select: { merchantURL: true },
+      });
+      const urls = group.map((g) => g.merchantURL);
+      return { auth, merchantURLs: urls, merchantURL: m.merchantURL };
+    }
+    return { auth, merchantURLs: [m.merchantURL], merchantURL: m.merchantURL };
   }
 
-  if (auth.role !== "MERCHANT" || !auth.merchantURL) throw new Error("Forbidden");
-  return { auth, merchantURL: auth.merchantURL };
+  if (auth.role !== "MERCHANT") throw new Error("Forbidden");
+
+  if (auth.redemptionGroupID) {
+    const group = await prisma.merchant.findMany({
+      where: { redemptionGroupID: auth.redemptionGroupID, active: true },
+      select: { merchantURL: true },
+    });
+    if (group.length === 0) throw new Error("Forbidden");
+    const urls = group.map((g) => g.merchantURL);
+    const target = new URL(request.url).searchParams.get("merchantURL");
+    const primary = target && urls.includes(target) ? target : urls[0];
+    return { auth, merchantURLs: urls, merchantURL: primary };
+  }
+
+  if (!auth.merchantURL) throw new Error("Forbidden");
+  return { auth, merchantURLs: [auth.merchantURL], merchantURL: auth.merchantURL };
+}
+
+// Backwards-compatible wrapper — single-URL callers (templates, redeem, etc.)
+export async function requireMerchantURL(request: Request) {
+  const { auth, merchantURL } = await requireMerchantAccess(request);
+  return { auth, merchantURL };
 }

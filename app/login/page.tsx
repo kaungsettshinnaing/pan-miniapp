@@ -23,7 +23,9 @@ export default function LoginPage() {
       const json = await res.json();
       if (!json.ok) { setError(json.error ?? "Login failed"); return; }
       const { role } = json.data as { role: string };
-      router.push(role === "ADMIN" ? "/admin" : "/");
+      if (role === "ADMIN") router.push("/admin");
+      else if (role === "CHANNEL_PARTNER") router.push("/cp");
+      else router.push("/");
     } catch {
       setError("Network error — please try again");
     } finally {
