@@ -1,5 +1,6 @@
 import { parseTelegramUser } from "@/lib/telegram-auth";
 import { prisma } from "@/lib/prisma";
+import { getSetting } from "@/lib/settings";
 import { ok, err } from "@/lib/api-response";
 
 export async function POST(request: Request) {
@@ -124,7 +125,7 @@ export async function POST(request: Request) {
     // Fire-and-forget → n8n sends Telegram messages (resilience backup channel)
     // If the mini app is blocked, merchants still process via the Telegram bot flow,
     // but notifications always go through n8n regardless of which channel processed the redemption.
-    const n8nUrl = process.env.N8N_WEBHOOK_URL;
+    const n8nUrl = await getSetting("N8N_WEBHOOK_URL");
     if (n8nUrl) {
       fetch(`${n8nUrl}/pan-cashback-issued`, {
         method: "POST",

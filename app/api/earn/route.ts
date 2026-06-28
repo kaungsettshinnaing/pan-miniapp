@@ -1,5 +1,6 @@
 import { parseTelegramUser } from "@/lib/telegram-auth";
 import { prisma } from "@/lib/prisma";
+import { getSetting } from "@/lib/settings";
 import { ok, err } from "@/lib/api-response";
 
 // POST /api/earn — customer enters merchant code, gets OTP
@@ -104,7 +105,7 @@ async function notifyMerchant(payload: {
   totalCashback: number;
   sessionId: string;
 }) {
-  const n8nUrl = process.env.N8N_WEBHOOK_URL;
+  const n8nUrl = await getSetting("N8N_WEBHOOK_URL");
   if (!n8nUrl) return;
   await fetch(`${n8nUrl}/pan-merchant-notify`, {
     method: "POST",

@@ -6,6 +6,7 @@ import MerchantCard from "@/components/MerchantCard";
 import EarnSheet from "@/components/EarnSheet";
 import ProfileSheet from "@/components/ProfileSheet";
 import MerchantProcessSheet from "@/components/MerchantProcessSheet";
+import TemplateEditorSheet from "@/components/TemplateEditorSheet";
 
 type Cashback = {
   id: string;
@@ -93,6 +94,7 @@ export default function Home() {
   const [earnOpen, setEarnOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [merchantOpen, setMerchantOpen] = useState(false);
+  const [templatesOpen, setTemplatesOpen] = useState(false);
   const [earnMerchant, setEarnMerchant] = useState<string | undefined>();
 
   const tgUser = typeof window !== "undefined"
@@ -269,6 +271,17 @@ export default function Home() {
             </p>
           </button>
 
+          {/* Message templates */}
+          <button
+            onClick={() => setTemplatesOpen(true)}
+            className="w-full rounded-2xl py-4 font-bold text-base text-white mb-4 cursor-pointer active:opacity-80 transition-opacity border border-pan-border bg-pan-card"
+          >
+            ✉️ Customize Messages
+            <p className="text-pan-muted text-sm font-normal mt-0.5">
+              Edit Telegram messages sent to customers
+            </p>
+          </button>
+
           {/* Tip about backup channel */}
           <div className="rounded-xl bg-pan-card/60 border border-pan-border px-4 py-3">
             <p className="text-pan-muted text-xs leading-relaxed">
@@ -335,6 +348,12 @@ export default function Home() {
           merchantName={merchantMeta.merchant.merchantName}
           apiFetch={apiFetch}
           onClose={() => setMerchantOpen(false)}
+        />
+      )}
+      {templatesOpen && (
+        <TemplateEditorSheet
+          apiFetch={apiFetch}
+          onClose={() => setTemplatesOpen(false)}
         />
       )}
     </main>

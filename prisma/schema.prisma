@@ -7,6 +7,12 @@ datasource db {
   provider = "postgresql"
 }
 
+model PlatformSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
 model RedemptionGroup {
   id          String     @id @default(cuid())
   groupName   String
