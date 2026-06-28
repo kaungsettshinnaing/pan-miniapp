@@ -5,13 +5,30 @@ import { ok, err } from "@/lib/api-response";
 
 export async function POST(request: Request) {
   try {
-    const { merchantURL, merchantURLs } = await requireMerchantAccess(request);
-
-    const body = (await request.json()) as { otpCode?: string; purchaseAmount?: number };
+    // Body must be read before requireMerchantAccess (guards only read headers/cookies)
+    const body = (await request.json()) as {
+      otpCode?: string;
+      purchaseAmount?: number;
+      merchantURL?: string;
+    };
     const { otpCode, purchaseAmount } = body;
 
     if (!otpCode || !purchaseAmount || purchaseAmount <= 0) {
       return err("otpCode and purchaseAmount are required", 400);
+    }
+
+    // Auth: normal merchant (Telegram initData or JWT) OR n8n internal call (API secret)
+    let merchantURL: string;
+    let merchantURLs: string[];
+    const apiSecret = request.headers.get("x-api-secret");
+    if (apiSecret && process.env.API_SECRET && apiSecret === process.env.API_SECRET) {
+      if (!body.merchantURL) return err("merchantURL required for API secret auth", 400);
+      merchantURL = body.merchantURL;
+      merchantURLs = [merchantURL];
+    } else {
+      const access = await requireMerchantAccess(request);
+      merchantURL = access.merchantURL;
+      merchantURLs = access.merchantURLs;
     }
 
     // Full merchant config for the processor's outlet
