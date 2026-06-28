@@ -1,5 +1,6 @@
 import "dotenv/config";
-import { PrismaClient, EarnType, CommissionType } from "../app/generated/prisma/client";
+import bcrypt from "bcryptjs";
+import { PrismaClient, EarnType, CommissionType, WebUserRole } from "../app/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
@@ -139,6 +140,21 @@ async function main() {
       },
       update: { imageURL: t.imageURL },
     });
+  }
+
+  // --- Admin web user from env vars ---
+  const adminUsername = process.env.ADMIN_USERNAME;
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  if (adminUsername && adminPassword) {
+    const passwordHash = await bcrypt.hash(adminPassword, 12);
+    await prisma.webUser.upsert({
+      where: { username: adminUsername },
+      create: { username: adminUsername, passwordHash, role: WebUserRole.ADMIN },
+      update: { passwordHash, role: WebUserRole.ADMIN },
+    });
+    console.log(`Admin user '${adminUsername}' created/updated.`);
+  } else {
+    console.log("Skipping admin user — set ADMIN_USERNAME and ADMIN_PASSWORD in .env.prod to create one.");
   }
 
   console.log("Seed complete.");

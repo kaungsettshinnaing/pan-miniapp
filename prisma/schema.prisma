@@ -45,6 +45,7 @@ model Merchant {
   otpSessions              OtpSession[]
   messageTemplates         MessageTemplate[]
   billing                  MonthlyBilling[]
+  webUsers                 WebUser[]
   createdAt                DateTime         @default(now())
   updatedAt                DateTime         @updatedAt
 }
@@ -133,6 +134,22 @@ model MonthlyBilling {
   createdAt       DateTime @default(now())
 
   @@unique([merchantURL, billingMonth])
+}
+
+model WebUser {
+  id           String      @id @default(cuid())
+  username     String      @unique
+  passwordHash String
+  role         WebUserRole
+  merchantURL  String?
+  merchant     Merchant?   @relation(fields: [merchantURL], references: [merchantURL])
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+}
+
+enum WebUserRole {
+  ADMIN
+  MERCHANT
 }
 
 enum EarnType {

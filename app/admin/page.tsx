@@ -1,9 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { apiFetch } from "@/app/page";
 
 type Setting = { key: string; value: string };
+
+type WebUser = {
+  id: string;
+  username: string;
+  role: "ADMIN" | "MERCHANT";
+  merchantURL: string | null;
+  createdAt: string;
+};
 
 type Merchant = {
   merchantURL: string;
@@ -29,28 +38,40 @@ const SETTING_LABELS: Record<string, string> = {
 };
 
 export default function AdminPage() {
-  const [tab, setTab] = useState<"settings" | "merchants">("settings");
+  const router = useRouter();
+  const [tab, setTab] = useState<"settings" | "merchants" | "users">("settings");
   const [settings, setSettings] = useState<Setting[]>([]);
   const [merchants, setMerchants] = useState<Merchant[]>([]);
+  const [webUsers, setWebUsers] = useState<WebUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState<string | null>(null);
   const [editMerchant, setEditMerchant] = useState<Merchant | null>(null);
   const [merchantSaving, setMerchantSaving] = useState(false);
+  const [newUser, setNewUser] = useState<{ username: string; password: string; role: "ADMIN" | "MERCHANT"; merchantURL: string } | null>(null);
+  const [newUserSaving, setNewUserSaving] = useState(false);
+  const [resetUser, setResetUser] = useState<{ id: string; username: string; password: string } | null>(null);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function logout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.push("/login");
+  }
 
   async function load() {
     setLoading(true);
     setError(null);
     try {
-      const [s, m] = await Promise.all([
+      const [s, m, u] = await Promise.all([
         apiFetch<Setting[]>("/api/admin/settings"),
         apiFetch<Merchant[]>("/api/admin/merchants"),
+        apiFetch<WebUser[]>("/api/admin/web-users"),
       ]);
       setSettings(s);
       setMerchants(m);
+      setWebUsers(u);
       const map: Record<string, string> = {};
       s.forEach((r) => { map[r.key] = r.value; });
       setEditing(map);
@@ -73,6 +94,43 @@ export default function AdminPage() {
       alert(e instanceof Error ? e.message : "Save failed");
     } finally {
       setSaving(null);
+    }
+  }
+
+  async function createUser() {
+    if (!newUser) return;
+    setNewUserSaving(true);
+    try {
+      await apiFetch("/api/admin/web-users", { method: "POST", body: JSON.stringify(newUser) });
+      setNewUser(null);
+      await load();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Failed");
+    } finally {
+      setNewUserSaving(false);
+    }
+  }
+
+  async function resetPassword() {
+    if (!resetUser) return;
+    setNewUserSaving(true);
+    try {
+      await apiFetch("/api/admin/web-users", { method: "PATCH", body: JSON.stringify({ id: resetUser.id, password: resetUser.password }) });
+      setResetUser(null);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Failed");
+    } finally {
+      setNewUserSaving(false);
+    }
+  }
+
+  async function deleteUser(id: string, username: string) {
+    if (!confirm(`Delete user "${username}"?`)) return;
+    try {
+      await apiFetch(`/api/admin/web-users?id=${id}`, { method: "DELETE" });
+      await load();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Failed");
     }
   }
 
@@ -104,7 +162,11 @@ export default function AdminPage() {
   if (error) return (
     <main className="max-w-[480px] mx-auto min-h-screen bg-pan-navy px-4 pt-10 text-center">
       <p className="text-pan-pink mb-2">{error}</p>
-      <button onClick={load} className="text-pan-muted text-sm underline">Retry</button>
+      {error.includes("Unauthorized") || error.includes("Forbidden") ? (
+        <button onClick={() => router.push("/login")} className="text-pan-pink text-sm font-bold underline">Sign In →</button>
+      ) : (
+        <button onClick={load} className="text-pan-muted text-sm underline">Retry</button>
+      )}
     </main>
   );
 
@@ -112,22 +174,25 @@ export default function AdminPage() {
     <main className="max-w-[480px] mx-auto min-h-screen bg-pan-navy px-4 pt-4 pb-24">
       <header className="flex items-center gap-3 mb-5">
         <div className="w-10 h-10 rounded-xl bg-pan-card flex items-center justify-center text-lg font-bold text-pan-pink">⚙️</div>
-        <div>
+        <div className="flex-1">
           <p className="text-white font-black">PAN Admin</p>
           <p className="text-pan-muted text-xs">Platform configuration</p>
         </div>
+        <button onClick={logout} className="text-pan-muted text-xs border border-pan-border rounded-lg px-3 py-1.5 cursor-pointer">
+          Sign out
+        </button>
       </header>
 
       {/* Tabs */}
       <div className="flex bg-pan-card rounded-xl p-1 mb-5">
-        {(["settings", "merchants"] as const).map((t) => (
+        {(["settings", "merchants", "users"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
             className="flex-1 py-2 rounded-lg text-sm font-bold cursor-pointer transition-colors capitalize"
             style={tab === t ? { background: "#f0206a", color: "#fff" } : { color: "#6b7fb0" }}
           >
-            {t === "settings" ? "⚙️ Settings" : "🏪 Merchants"}
+            {t === "settings" ? "⚙️ Settings" : t === "merchants" ? "🏪 Merchants" : "👥 Users"}
           </button>
         ))}
       </div>
@@ -194,6 +259,145 @@ export default function AdminPage() {
             </div>
           ))}
         </div>
+      )}
+
+      {/* Users tab */}
+      {tab === "users" && (
+        <div className="space-y-3">
+          <button
+            onClick={() => setNewUser({ username: "", password: "", role: "MERCHANT", merchantURL: "" })}
+            className="w-full rounded-xl py-3 text-sm font-bold text-white cursor-pointer"
+            style={{ background: "linear-gradient(135deg,#f0206a,#c01253)" }}
+          >
+            + Create Login
+          </button>
+          {webUsers.map((u) => (
+            <div key={u.id} className="rounded-xl bg-pan-card border border-pan-border p-4 flex items-center gap-3">
+              <div className="w-9 h-9 rounded-full bg-pan-navy flex items-center justify-center text-sm font-bold text-pan-pink">
+                {u.username[0]?.toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-white font-bold text-sm">{u.username}</p>
+                <p className="text-pan-muted text-xs">{u.role}{u.merchantURL ? ` · ${u.merchantURL}` : ""}</p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setResetUser({ id: u.id, username: u.username, password: "" })}
+                  className="text-pan-muted text-xs border border-pan-border rounded-lg px-2 py-1 cursor-pointer"
+                >
+                  Reset
+                </button>
+                <button
+                  onClick={() => deleteUser(u.id, u.username)}
+                  className="text-pan-pink text-xs border border-pan-pink/30 rounded-lg px-2 py-1 cursor-pointer"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          ))}
+          {webUsers.length === 0 && (
+            <p className="text-center text-pan-muted text-sm py-6">No web logins yet.</p>
+          )}
+        </div>
+      )}
+
+      {/* Create user sheet */}
+      {newUser && (
+        <>
+          <div className="fixed inset-0 z-40 bg-black/60" onClick={() => setNewUser(null)} />
+          <div className="fixed bottom-0 left-0 right-0 z-50 max-w-[480px] mx-auto rounded-t-2xl bg-pan-overlay px-5 pt-4 pb-10 shadow-2xl">
+            <div className="mx-auto mb-4 w-10 h-1 rounded-full bg-pan-border" />
+            <h2 className="text-lg font-bold text-white mb-4">Create Login</h2>
+            {[
+              { label: "Username", field: "username", type: "text" },
+              { label: "Password", field: "password", type: "password" },
+            ].map(({ label, field, type }) => (
+              <div key={field} className="mb-4">
+                <p className="text-pan-muted text-xs uppercase tracking-widest font-bold mb-1">{label}</p>
+                <input
+                  type={type}
+                  value={(newUser as Record<string, string>)[field]}
+                  onChange={(e) => setNewUser({ ...newUser, [field]: e.target.value })}
+                  autoCapitalize="none"
+                  className="w-full bg-pan-card border border-pan-border rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-pan-pink"
+                />
+              </div>
+            ))}
+            <div className="mb-4">
+              <p className="text-pan-muted text-xs uppercase tracking-widest font-bold mb-1">Role</p>
+              <div className="flex gap-2">
+                {(["ADMIN", "MERCHANT"] as const).map((r) => (
+                  <button
+                    key={r}
+                    onClick={() => setNewUser({ ...newUser, role: r })}
+                    className="flex-1 py-2 rounded-lg text-sm font-bold cursor-pointer transition-colors"
+                    style={newUser.role === r ? { background: "#f0206a", color: "#fff" } : { background: "#1e2d5a", color: "#6b7fb0" }}
+                  >
+                    {r}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {newUser.role === "MERCHANT" && (
+              <div className="mb-4">
+                <p className="text-pan-muted text-xs uppercase tracking-widest font-bold mb-1">Merchant URL</p>
+                <select
+                  value={newUser.merchantURL}
+                  onChange={(e) => setNewUser({ ...newUser, merchantURL: e.target.value })}
+                  className="w-full bg-pan-card border border-pan-border rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-pan-pink"
+                >
+                  <option value="">— select merchant —</option>
+                  {merchants.map((m) => (
+                    <option key={m.merchantURL} value={m.merchantURL}>{m.merchantName} ({m.merchantURL})</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <div className="flex gap-3">
+              <button onClick={() => setNewUser(null)} className="flex-1 rounded-xl py-3 text-sm font-bold text-pan-muted border border-pan-border cursor-pointer">Cancel</button>
+              <button
+                onClick={createUser}
+                disabled={newUserSaving || !newUser.username || !newUser.password}
+                className="flex-1 rounded-xl py-3 text-sm font-bold text-white disabled:opacity-40 cursor-pointer"
+                style={{ background: "linear-gradient(135deg,#f0206a,#c01253)" }}
+              >
+                {newUserSaving ? "Creating…" : "Create"}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Reset password sheet */}
+      {resetUser && (
+        <>
+          <div className="fixed inset-0 z-40 bg-black/60" onClick={() => setResetUser(null)} />
+          <div className="fixed bottom-0 left-0 right-0 z-50 max-w-[480px] mx-auto rounded-t-2xl bg-pan-overlay px-5 pt-4 pb-10 shadow-2xl">
+            <div className="mx-auto mb-4 w-10 h-1 rounded-full bg-pan-border" />
+            <h2 className="text-lg font-bold text-white mb-1">Reset Password</h2>
+            <p className="text-pan-muted text-sm mb-4">{resetUser.username}</p>
+            <p className="text-pan-muted text-xs uppercase tracking-widest font-bold mb-1">New Password</p>
+            <input
+              type="password"
+              value={resetUser.password}
+              onChange={(e) => setResetUser({ ...resetUser, password: e.target.value })}
+              placeholder="Enter new password"
+              className="w-full bg-pan-card border border-pan-border rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-pan-pink mb-4"
+            />
+            <div className="flex gap-3">
+              <button onClick={() => setResetUser(null)} className="flex-1 rounded-xl py-3 text-sm font-bold text-pan-muted border border-pan-border cursor-pointer">Cancel</button>
+              <button
+                onClick={resetPassword}
+                disabled={newUserSaving || !resetUser.password}
+                className="flex-1 rounded-xl py-3 text-sm font-bold text-white disabled:opacity-40 cursor-pointer"
+                style={{ background: "linear-gradient(135deg,#f0206a,#c01253)" }}
+              >
+                {newUserSaving ? "Saving…" : "Reset"}
+              </button>
+            </div>
+          </div>
+        </>
       )}
 
       {/* Merchant edit sheet */}

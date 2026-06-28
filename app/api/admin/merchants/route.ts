@@ -1,10 +1,10 @@
-import { parseAdminUser } from "@/lib/admin-auth";
+import { requireAdmin } from "@/lib/web-auth";
 import { prisma } from "@/lib/prisma";
 import { ok, err } from "@/lib/api-response";
 
 export async function GET(request: Request) {
   try {
-    parseAdminUser(request, process.env.TELEGRAM_BOT_TOKEN!);
+    await requireAdmin(request);
     const merchants = await prisma.merchant.findMany({
       orderBy: { merchantName: "asc" },
       include: { redemptionGroup: { select: { groupName: true } } },
@@ -12,25 +12,14 @@ export async function GET(request: Request) {
     return ok(merchants);
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Error";
-    return err(msg, msg.includes("Forbidden") ? 403 : msg.includes("initData") ? 401 : 500);
+    return err(msg, msg === "Forbidden" ? 403 : msg === "Unauthorized" ? 401 : 500);
   }
 }
 
 export async function PATCH(request: Request) {
   try {
-    parseAdminUser(request, process.env.TELEGRAM_BOT_TOKEN!);
-    const body = (await request.json()) as {
-      merchantURL?: string;
-      botToken?: string | null;
-      active?: boolean;
-      earnType?: string;
-      earnValue?: number;
-      commissionType?: string;
-      commissionValue?: number;
-      subscriptionFee?: number;
-      rebateValidityDays?: number;
-      redemptionGroupID?: string | null;
-    };
+    await requireAdmin(request);
+    const body = (await request.json()) as { merchantURL?: string } & Record<string, unknown>;
     if (!body.merchantURL) return err("merchantURL is required", 400);
     const { merchantURL, ...data } = body;
     const merchant = await prisma.merchant.update({
@@ -40,6 +29,6 @@ export async function PATCH(request: Request) {
     return ok(merchant);
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Error";
-    return err(msg, msg.includes("Forbidden") ? 403 : msg.includes("initData") ? 401 : 500);
+    return err(msg, msg === "Forbidden" ? 403 : msg === "Unauthorized" ? 401 : 500);
   }
 }
