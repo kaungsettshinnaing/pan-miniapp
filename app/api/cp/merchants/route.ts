@@ -11,6 +11,7 @@ const MERCHANT_SELECT = {
   earnType: true,
   earnValue: true,
   commissionType: true,
+  commissionBasis: true,
   commissionValue: true,
   subscriptionFee: true,
   rebateValidityDays: true,
@@ -52,6 +53,7 @@ export async function POST(request: Request) {
         earnType: (body.earnType as never) || "PERCENTAGE",
         earnValue: Number(body.earnValue),
         commissionType: (body.commissionType as never) || "PERCENTAGE",
+        commissionBasis: (body.commissionBasis as never) || "RETURN_TRANSACTION",
         commissionValue: Number(body.commissionValue ?? 0),
         subscriptionFee: Number(body.subscriptionFee ?? 0),
         rebateValidityDays: Number(body.rebateValidityDays ?? 14),
@@ -70,19 +72,49 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   try {
     const { cpId } = await requireChannelPartner(request);
-    const body = (await request.json()) as { merchantURL?: string } & Record<string, unknown>;
+    const body = (await request.json()) as {
+      merchantURL?: string;
+      merchantName?: string;
+      outletName?: string | null;
+      merchantTelegramID?: string;
+      active?: boolean;
+      earnType?: string;
+      earnValue?: number;
+      commissionType?: string;
+      commissionBasis?: string;
+      commissionValue?: number;
+      subscriptionFee?: number;
+      rebateValidityDays?: number;
+    };
     if (!body.merchantURL) return err("merchantURL is required", 400);
 
     // Verify ownership
     const existing = await prisma.merchant.findFirst({
-      where: { merchantURL: body.merchantURL as string, channelPartnerID: cpId },
+      where: { merchantURL: body.merchantURL, channelPartnerID: cpId },
     });
     if (!existing) return err("Merchant not found or not yours", 404);
 
-    const { merchantURL, ...data } = body;
+    const {
+      merchantURL,
+      merchantName, outletName, merchantTelegramID, active,
+      earnType, earnValue, commissionType, commissionBasis, commissionValue,
+      subscriptionFee, rebateValidityDays,
+    } = body;
     const merchant = await prisma.merchant.update({
       where: { merchantURL },
-      data: data as Parameters<typeof prisma.merchant.update>[0]["data"],
+      data: {
+        ...(merchantName !== undefined && { merchantName }),
+        ...(outletName !== undefined && { outletName }),
+        ...(merchantTelegramID !== undefined && { merchantTelegramID }),
+        ...(active !== undefined && { active }),
+        ...(earnType !== undefined && { earnType: earnType as never }),
+        ...(earnValue !== undefined && { earnValue }),
+        ...(commissionType !== undefined && { commissionType: commissionType as never }),
+        ...(commissionBasis !== undefined && { commissionBasis: commissionBasis as never }),
+        ...(commissionValue !== undefined && { commissionValue }),
+        ...(subscriptionFee !== undefined && { subscriptionFee }),
+        ...(rebateValidityDays !== undefined && { rebateValidityDays }),
+      },
       select: MERCHANT_SELECT,
     });
     return ok(merchant);

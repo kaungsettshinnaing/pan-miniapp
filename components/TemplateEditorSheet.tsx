@@ -24,9 +24,10 @@ const VARIABLES = ["{{cashbackAmt}}", "{{expiryDate}}", "{{merchantName}}", "{{p
 type Props = {
   apiFetch: <T>(path: string, opts?: RequestInit) => Promise<T>;
   onClose: () => void;
+  adminMerchantURL?: string; // when set, uses admin endpoint for this specific merchant
 };
 
-export default function TemplateEditorSheet({ apiFetch, onClose }: Props) {
+export default function TemplateEditorSheet({ apiFetch, onClose, adminMerchantURL }: Props) {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<string | null>(null);
@@ -34,12 +35,16 @@ export default function TemplateEditorSheet({ apiFetch, onClose }: Props) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
+  const getUrl = adminMerchantURL
+    ? `/api/admin/templates?merchantURL=${encodeURIComponent(adminMerchantURL)}`
+    : "/api/merchant/templates";
+
   useEffect(() => { loadTemplates(); }, []);
 
   async function loadTemplates() {
     setLoading(true);
     try {
-      const data = await apiFetch<Template[]>("/api/merchant/templates");
+      const data = await apiFetch<Template[]>(getUrl);
       setTemplates(data);
     } finally {
       setLoading(false);
@@ -60,14 +65,11 @@ export default function TemplateEditorSheet({ apiFetch, onClose }: Props) {
     if (!selected) return;
     setSaving(true);
     try {
-      await apiFetch("/api/merchant/templates", {
-        method: "PUT",
-        body: JSON.stringify({
-          trigger: selected,
-          messageText: form.messageText || null,
-          imageURL: form.imageURL || null,
-        }),
-      });
+      const putUrl = adminMerchantURL ? "/api/admin/templates" : "/api/merchant/templates";
+      const putBody = adminMerchantURL
+        ? { merchantURL: adminMerchantURL, trigger: selected, messageText: form.messageText || null, imageURL: form.imageURL || null }
+        : { trigger: selected, messageText: form.messageText || null, imageURL: form.imageURL || null };
+      await apiFetch(putUrl, { method: "PUT", body: JSON.stringify(putBody) });
       await loadTemplates();
       setSaved(true);
     } catch (e) {

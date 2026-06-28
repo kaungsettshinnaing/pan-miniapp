@@ -32,6 +32,7 @@ model Merchant {
   earnType                 EarnType         @default(PERCENTAGE)
   earnValue                Float            @default(10) // % or fixed Ks amount
   commissionType           CommissionType   @default(PERCENTAGE)
+  commissionBasis          CommissionBasis  @default(RETURN_TRANSACTION)
   commissionValue          Float            @default(0)
   subscriptionFee          Float            @default(0)
   rebateValidityDays       Int              @default(14)
@@ -71,10 +72,11 @@ model Cashback {
   id                 String    @id @default(cuid())
   merchantURL        String
   customerTelegramID String
-  cashbackAmt        Float
-  expiryDate         DateTime
-  redeemed           Boolean   @default(false)
-  redemptionDate     DateTime?
+  cashbackAmt            Float
+  originalPurchaseAmount Float    @default(0)   // gross purchase that generated this cashback
+  expiryDate             DateTime
+  redeemed               Boolean  @default(false)
+  redemptionDate         DateTime?
   merchant           Merchant  @relation(fields: [merchantURL], references: [merchantURL])
   customer           Customer  @relation(fields: [customerTelegramID], references: [customerTelegramID])
   createdAt          DateTime  @default(now())
@@ -168,6 +170,11 @@ enum EarnType {
 enum CommissionType {
   PERCENTAGE
   FLAT
+}
+
+enum CommissionBasis {
+  RETURN_TRANSACTION    // commission % on current visit's gross purchase
+  INITIAL_TRANSACTION  // commission % on the purchase that generated the redeemed cashback
 }
 
 enum Platform {

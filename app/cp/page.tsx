@@ -13,6 +13,7 @@ type Merchant = {
   earnType: string;
   earnValue: number;
   commissionType: string;
+  commissionBasis: string;
   commissionValue: number;
   subscriptionFee: number;
   rebateValidityDays: number;
@@ -49,7 +50,7 @@ function fmtPct(n: number) { return `${n}%`; }
 const BLANK_FORM = {
   merchantURL: "", merchantName: "", outletName: "", merchantTelegramID: "",
   earnType: "PERCENTAGE", earnValue: "10",
-  commissionType: "PERCENTAGE", commissionValue: "0",
+  commissionType: "PERCENTAGE", commissionBasis: "RETURN_TRANSACTION", commissionValue: "0",
   subscriptionFee: "0", rebateValidityDays: "14",
 };
 
@@ -280,26 +281,92 @@ export default function CPPage() {
       {editMerchant && (
         <>
           <div className="fixed inset-0 z-40 bg-black/60" onClick={() => setEditMerchant(null)} />
-          <div className="fixed bottom-0 left-0 right-0 z-50 max-w-[480px] mx-auto rounded-t-2xl bg-pan-overlay px-5 pt-4 pb-10 shadow-2xl overflow-y-auto max-h-[85vh]">
+          <div className="fixed bottom-0 left-0 right-0 z-50 max-w-[480px] mx-auto rounded-t-2xl bg-pan-overlay px-5 pt-4 pb-10 shadow-2xl overflow-y-auto max-h-[90vh]">
             <div className="mx-auto mb-4 w-10 h-1 rounded-full bg-pan-border" />
             <h2 className="text-lg font-bold text-white mb-4">Edit — {editMerchant.merchantName}</h2>
             {([
               { label: "Merchant Name", field: "merchantName", type: "text" },
               { label: "Outlet Name", field: "outletName", type: "text" },
               { label: "Telegram ID (cashier)", field: "merchantTelegramID", type: "text" },
-              { label: "Earn Value", field: "earnValue", type: "number" },
-              { label: "Commission Value", field: "commissionValue", type: "number" },
-              { label: "Subscription Fee (Ks)", field: "subscriptionFee", type: "number" },
-              { label: "Rebate Validity (days)", field: "rebateValidityDays", type: "number" },
             ] as const).map(({ label, field, type }) => (
               <div key={field} className="mb-4">
                 <p className="text-pan-muted text-xs uppercase tracking-widest font-bold mb-1">{label}</p>
                 <input type={type}
                   value={(editMerchant as Record<string, unknown>)[field] as string ?? ""}
-                  onChange={e => setEditMerchant({ ...editMerchant, [field]: type === "number" ? Number(e.target.value) : e.target.value })}
+                  onChange={e => setEditMerchant({ ...editMerchant, [field]: e.target.value })}
                   className="w-full bg-pan-card border border-pan-border rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-pan-pink" />
               </div>
             ))}
+
+            {/* Earn type + value */}
+            <div className="mb-3">
+              <p className="text-pan-muted text-xs uppercase tracking-widest font-bold mb-1">Cashback Type</p>
+              <div className="flex gap-2 mb-2">
+                {["PERCENTAGE", "FIXED"].map(t => (
+                  <button key={t} onClick={() => setEditMerchant({ ...editMerchant, earnType: t })}
+                    className="flex-1 py-2 rounded-lg text-xs font-bold cursor-pointer"
+                    style={editMerchant.earnType === t ? { background: "#f0206a", color: "#fff" } : { background: "#1e2d5a", color: "#6b7fb0" }}>
+                    {t === "PERCENTAGE" ? "% of purchase" : "Fixed Ks"}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="mb-4">
+              <p className="text-pan-muted text-xs uppercase tracking-widest font-bold mb-1">Earn Value</p>
+              <input type="number" min="0" step="0.1" value={editMerchant.earnValue}
+                onChange={e => setEditMerchant({ ...editMerchant, earnValue: Number(e.target.value) })}
+                className="w-full bg-pan-card border border-pan-border rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-pan-pink" />
+            </div>
+
+            {/* Commission type + basis + value */}
+            <div className="mb-3">
+              <p className="text-pan-muted text-xs uppercase tracking-widest font-bold mb-1">PAN Commission</p>
+              <div className="flex gap-2 mb-2">
+                {["PERCENTAGE", "FLAT"].map(t => (
+                  <button key={t} onClick={() => setEditMerchant({ ...editMerchant, commissionType: t })}
+                    className="flex-1 py-2 rounded-lg text-xs font-bold cursor-pointer"
+                    style={editMerchant.commissionType === t ? { background: "#f0206a", color: "#fff" } : { background: "#1e2d5a", color: "#6b7fb0" }}>
+                    {t === "PERCENTAGE" ? "% of sale" : "Flat Ks"}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {editMerchant.commissionType === "PERCENTAGE" && (
+              <div className="mb-3">
+                <p className="text-pan-muted text-xs uppercase tracking-widest font-bold mb-1">Commission Basis</p>
+                <div className="flex gap-2 mb-2">
+                  {[
+                    { value: "RETURN_TRANSACTION", label: "Return Visit" },
+                    { value: "INITIAL_TRANSACTION", label: "Original Visit" },
+                  ].map(o => (
+                    <button key={o.value} onClick={() => setEditMerchant({ ...editMerchant, commissionBasis: o.value })}
+                      className="flex-1 py-2 rounded-lg text-xs font-bold cursor-pointer"
+                      style={editMerchant.commissionBasis === o.value ? { background: "#f0206a", color: "#fff" } : { background: "#1e2d5a", color: "#6b7fb0" }}>
+                      {o.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="mb-4">
+              <p className="text-pan-muted text-xs uppercase tracking-widest font-bold mb-1">Commission Value</p>
+              <input type="number" min="0" step="0.1" value={editMerchant.commissionValue}
+                onChange={e => setEditMerchant({ ...editMerchant, commissionValue: Number(e.target.value) })}
+                className="w-full bg-pan-card border border-pan-border rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-pan-pink" />
+            </div>
+
+            {([
+              { label: "Subscription Fee (Ks)", field: "subscriptionFee" },
+              { label: "Cashback Validity (days)", field: "rebateValidityDays" },
+            ] as const).map(({ label, field }) => (
+              <div key={field} className="mb-4">
+                <p className="text-pan-muted text-xs uppercase tracking-widest font-bold mb-1">{label}</p>
+                <input type="number" min="0" value={editMerchant[field] as number}
+                  onChange={e => setEditMerchant({ ...editMerchant, [field]: Number(e.target.value) })}
+                  className="w-full bg-pan-card border border-pan-border rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-pan-pink" />
+              </div>
+            ))}
+
             <div className="mb-5">
               <p className="text-pan-muted text-xs uppercase tracking-widest font-bold mb-1">Status</p>
               <button onClick={() => setEditMerchant({ ...editMerchant, active: !editMerchant.active })}

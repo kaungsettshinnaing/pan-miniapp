@@ -1,12 +1,11 @@
-import { parseTelegramUser } from "@/lib/telegram-auth";
+import { requireMerchantAccess } from "@/lib/web-auth";
 import { prisma } from "@/lib/prisma";
 import { getSetting } from "@/lib/settings";
 import { ok, err } from "@/lib/api-response";
 
 export async function POST(request: Request) {
   try {
-    const { user } = parseTelegramUser(request, process.env.TELEGRAM_BOT_TOKEN!);
-    const merchantTelegramID = String(user.id);
+    const { merchantURL, merchantURLs } = await requireMerchantAccess(request);
 
     const body = (await request.json()) as { otpCode?: string; purchaseAmount?: number };
     const { otpCode, purchaseAmount } = body;
@@ -15,66 +14,81 @@ export async function POST(request: Request) {
       return err("otpCode and purchaseAmount are required", 400);
     }
 
-    // Verify the caller is an active merchant
-    const merchant = await prisma.merchant.findFirst({
-      where: { merchantTelegramID, active: true },
-    });
-    if (!merchant) return err("Not authorized as a merchant", 403);
+    // Full merchant config for the processor's outlet
+    const merchant = await prisma.merchant.findUnique({ where: { merchantURL } });
+    if (!merchant || !merchant.active) return err("Not authorized as a merchant", 403);
 
     // Fetch the OTP session
     const otp = await prisma.otpSession.findFirst({
       where: { otpCode, used: false, expiresAt: { gte: new Date() } },
       include: {
-        merchant: { select: { merchantURL: true, redemptionGroupID: true } },
-        customer: { select: { customerTelegramID: true, firstName: true, lastName: true } },
+        customer: { select: { customerTelegramID: true, firstName: true } },
       },
     });
     if (!otp) return err("Invalid or expired PIN", 400);
 
-    // Authorize: processing merchant must be the OTP merchant or in the same redemption group
-    const isSame = otp.merchantURL === merchant.merchantURL;
-    const inGroup =
-      !isSame &&
-      !!merchant.redemptionGroupID &&
-      merchant.redemptionGroupID === otp.merchant.redemptionGroupID;
-    if (!isSame && !inGroup) return err("This PIN was not issued for your merchant", 403);
+    // Authorize: OTP must be for a merchant the caller can access (same outlet or same group)
+    if (!merchantURLs.includes(otp.merchantURL)) {
+      return err("This PIN was not issued for your merchant", 403);
+    }
 
     const { customerTelegramID } = otp;
     const now = new Date();
     const billingMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
-    // Determine which merchantURLs are eligible for redemption
-    let groupURLs: string[] | null = null;
-    if (otp.merchant.redemptionGroupID) {
-      const peers = await prisma.merchant.findMany({
-        where: { redemptionGroupID: otp.merchant.redemptionGroupID },
-        select: { merchantURL: true },
-      });
-      groupURLs = peers.map((p: { merchantURL: string }) => p.merchantURL);
-    }
+    // Fetch originalPurchaseAmount from the active cashback being redeemed.
+    // Needed for INITIAL_TRANSACTION commission basis (commission on the purchase that generated
+    // the cashback, not the current visit). Defaults to 0 for historical/first-visit data.
+    const activeCashback = await prisma.cashback.findFirst({
+      where: {
+        customerTelegramID,
+        merchantURL: { in: merchantURLs },
+        redeemed: false,
+        expiryDate: { gte: now },
+      },
+      select: { originalPurchaseAmount: true },
+    });
+    const originalPurchaseAmount = activeCashback?.originalPurchaseAmount ?? 0;
 
-    // Cashback calculation for the new purchase (at processor merchant)
+    // NET purchase = gross minus redeemed cashback (clamped to 0)
+    const netPurchase = Math.max(0, purchaseAmount - otp.totalCashback);
+
+    // New cashback on NET purchase only; net=0 → no cashback
     const newCashbackAmt =
-      merchant.earnType === "PERCENTAGE"
-        ? purchaseAmount * (merchant.earnValue / 100)
+      netPurchase === 0
+        ? 0
+        : merchant.earnType === "PERCENTAGE"
+        ? netPurchase * (merchant.earnValue / 100)
         : merchant.earnValue;
+
     const expiryDate = new Date(
       now.getTime() + merchant.rebateValidityDays * 24 * 60 * 60 * 1000
     );
 
-    // Commission calculation
-    const commissionEarned =
+    // Commission: FLAT is always flat rate; PERCENTAGE depends on commissionBasis
+    //   RETURN_TRANSACTION  → % of current visit's gross purchase
+    //   INITIAL_TRANSACTION → % of the purchase that generated the cashback being redeemed
+    const commissionBase =
       merchant.commissionType === "PERCENTAGE"
-        ? purchaseAmount * (merchant.commissionValue / 100)
-        : merchant.commissionValue;
+        ? merchant.commissionBasis === "RETURN_TRANSACTION"
+          ? purchaseAmount
+          : originalPurchaseAmount
+        : null;
+    const commissionEarned =
+      merchant.commissionType === "FLAT"
+        ? merchant.commissionValue
+        : (commissionBase ?? 0) * (merchant.commissionValue / 100);
 
-    // Single transaction: redeem → purchase → new cashback → billing
+    // Single transaction: redeem → purchase → new cashback → billing → mark OTP used
     await prisma.$transaction(async (tx) => {
       // 1. Mark active cashbacks as redeemed
       await tx.cashback.updateMany({
-        where: groupURLs
-          ? { customerTelegramID, merchantURL: { in: groupURLs }, redeemed: false, expiryDate: { gte: now } }
-          : { customerTelegramID, merchantURL: otp.merchantURL, redeemed: false, expiryDate: { gte: now } },
+        where: {
+          customerTelegramID,
+          merchantURL: { in: merchantURLs },
+          redeemed: false,
+          expiryDate: { gte: now },
+        },
         data: { redeemed: true, redemptionDate: now },
       });
 
@@ -89,15 +103,18 @@ export async function POST(request: Request) {
         },
       });
 
-      // 3. Issue new cashback
-      await tx.cashback.create({
-        data: {
-          merchantURL: merchant.merchantURL,
-          customerTelegramID,
-          cashbackAmt: newCashbackAmt,
-          expiryDate,
-        },
-      });
+      // 3. Issue new cashback (skipped when net = 0)
+      if (newCashbackAmt > 0) {
+        await tx.cashback.create({
+          data: {
+            merchantURL: merchant.merchantURL,
+            customerTelegramID,
+            cashbackAmt: newCashbackAmt,
+            originalPurchaseAmount: purchaseAmount, // stored so next visit can use INITIAL commission
+            expiryDate,
+          },
+        });
+      }
 
       // 4. Accumulate commission into monthly billing
       await tx.monthlyBilling.upsert({
@@ -115,16 +132,14 @@ export async function POST(request: Request) {
         },
       });
 
-      // 5. Mark OTP used inside the transaction so concurrent retries fail
+      // 5. Mark OTP used so concurrent retries fail
       await tx.otpSession.update({
         where: { id: otp.id },
         data: { used: true },
       });
     });
 
-    // Fire-and-forget → n8n sends Telegram messages (resilience backup channel)
-    // If the mini app is blocked, merchants still process via the Telegram bot flow,
-    // but notifications always go through n8n regardless of which channel processed the redemption.
+    // Fire-and-forget → n8n sends Telegram messages to customer
     const n8nUrl = await getSetting("N8N_WEBHOOK_URL");
     if (n8nUrl) {
       fetch(`${n8nUrl}/pan-cashback-issued`, {
@@ -137,8 +152,9 @@ export async function POST(request: Request) {
           merchantName: merchant.merchantName,
           purchaseAmount,
           redeemedAmount: otp.totalCashback,
+          netPurchase,
           newCashbackAmt,
-          expiryDate: expiryDate.toISOString(),
+          expiryDate: newCashbackAmt > 0 ? expiryDate.toISOString() : null,
           commissionEarned,
         }),
       }).catch(() => {});
@@ -146,17 +162,17 @@ export async function POST(request: Request) {
 
     return ok({
       redeemedAmount: otp.totalCashback,
+      netPurchase,
       newCashbackAmt,
       purchaseAmount,
       merchantName: merchant.merchantName,
       customerName: otp.customer.firstName ?? "Customer",
-      expiryDate: expiryDate.toISOString(),
+      expiryDate: newCashbackAmt > 0 ? expiryDate.toISOString() : null,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Unknown error";
-    if (msg.includes("initData") || msg.includes("signature") || msg.includes("header")) {
-      return err(msg, 401);
-    }
+    if (msg === "Unauthorized") return err(msg, 401);
+    if (msg === "Forbidden") return err(msg, 403);
     console.error("[redeem]", e);
     return err("Internal error", 500);
   }

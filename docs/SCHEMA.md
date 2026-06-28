@@ -41,15 +41,16 @@ createdAt   DateTime  @default(now())
 ## Merchant
 
 ```prisma
-merchantURL              String    @id          // slug used in QR codes and API
+merchantURL              String           @id   // slug used in QR codes and API
 merchantName             String
 outletName               String?
 merchantTelegramID       String                 // Telegram ID of the cashier/owner
-active                   Boolean   @default(true)
+active                   Boolean          @default(true)
 botToken                 String?               // custom bot; null = use PAN shared bot
 earnType                 EarnType              // PERCENTAGE | FIXED
-earnValue                Float                 // % of purchase or fixed Ks
+earnValue                Float                 // % of NET purchase or fixed Ks
 commissionType           CommissionType        // PERCENTAGE | FLAT
+commissionBasis          CommissionBasis   @default(RETURN_TRANSACTION)
 commissionValue          Float                 // PAN's cut per redemption
 subscriptionFee          Float                 // monthly flat fee in Ks
 rebateValidityDays       Int       @default(14)
@@ -63,8 +64,12 @@ createdAt / updatedAt
 ```
 
 **Enums:**
-- `EarnType`: `PERCENTAGE` (cashback = purchaseAmount × earnValue/100) | `FIXED` (flat Ks amount)
-- `CommissionType`: `PERCENTAGE` (commission = purchaseAmount × commissionValue/100) | `FLAT` (flat Ks per transaction)
+- `EarnType`: `PERCENTAGE` | `FIXED`
+- `CommissionType`: `PERCENTAGE` | `FLAT`
+- `CommissionBasis`: `RETURN_TRANSACTION` | `INITIAL_TRANSACTION`
+  - Only relevant when `commissionType = PERCENTAGE`
+  - `RETURN_TRANSACTION`: commission % on current visit's gross purchase
+  - `INITIAL_TRANSACTION`: commission % on the purchase amount that generated the cashback being redeemed (stored in `Cashback.originalPurchaseAmount`)
 
 ---
 
@@ -88,22 +93,32 @@ Customers are upserted on first `/api/balance` call — no pre-registration need
 The loyalty ledger. One row per cashback issued.
 
 ```prisma
-id                 String    @id @default(cuid())
-merchantURL        String    // FK → Merchant
-customerTelegramID String    // FK → Customer
-cashbackAmt        Float     // Ks amount
-expiryDate         DateTime
-redeemed           Boolean   @default(false)
-redemptionDate     DateTime?
-createdAt          DateTime  @default(now())
+id                     String    @id @default(cuid())
+merchantURL            String    // FK → Merchant
+customerTelegramID     String    // FK → Customer
+cashbackAmt            Float     // Ks amount
+originalPurchaseAmount Float     @default(0)  // gross purchase that generated this cashback
+expiryDate             DateTime
+redeemed               Boolean   @default(false)
+redemptionDate         DateTime?
+createdAt              DateTime  @default(now())
 
 @@index([merchantURL, customerTelegramID, redeemed, expiryDate])
 ```
 
 **Business rules:**
+- Earn and redeem always happen in the same visit — one cashback per customer per merchant/group at a time; previous cashback must be redeemed before a new one is issued
 - No partial redemption — all unredeemed cashbacks for that merchant (or group) are consumed at once
-- After redemption, a new cashback is issued immediately based on the new purchase amount (same earn formula)
+- **NET purchase** = `max(0, grossPurchase − totalRedeemed)`. If net = 0, **no new cashback is issued**
+- New cashback = `net × earnRate%` (PERCENTAGE) or `earnValue` (FIXED, only if net > 0)
+- `originalPurchaseAmount` is set to the current gross purchase when the cashback is created. Next visit, if `commissionBasis = INITIAL_TRANSACTION`, this value is used for commission calculation
 - Expiry is `now() + rebateValidityDays`
+
+**Cashback calculation example:**
+- Gross purchase Ks 20,000 · existing cashback Ks 2,000 → net Ks 18,000
+- earnType=PERCENTAGE, earnValue=5 → new cashback = 18,000 × 5% = **Ks 900**
+- commissionType=PERCENTAGE, commissionBasis=RETURN_TRANSACTION, commissionValue=1 → commission = 20,000 × 1% = **Ks 200**
+- same but INITIAL_TRANSACTION (originalPurchaseAmount=40,000) → commission = 40,000 × 1% = **Ks 400**
 
 ---
 
@@ -257,5 +272,6 @@ Stored in `prisma/migrations/` as hand-written SQL (Docker was unavailable local
 | `20260628000001_platform_settings` | `PlatformSetting` table |
 | `20260628000002_web_users` | `WebUser` table + `WebUserRole` enum |
 | `20260628000003_channel_partner` | `CHANNEL_PARTNER` enum value, `WebUser.redemptionGroupID`, `WebUser.profitSharePct`, `Merchant.channelPartnerID` |
+| `20260628000004_commission_basis` | `CommissionBasis` enum, `Merchant.commissionBasis`, `Cashback.originalPurchaseAmount` |
 
 Apply on VPS: `npx prisma migrate deploy` (run inside the app container).

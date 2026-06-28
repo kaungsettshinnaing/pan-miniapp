@@ -150,6 +150,7 @@ export async function GET(request: Request) {
 | `GET /api/cp/earnings` | — | — | — | ✓ | — |
 | `GET/POST /api/admin/settings` | — | — | — | — | ✓ |
 | `GET/PATCH /api/admin/merchants` | — | — | — | — | ✓ |
+| `GET/PUT /api/admin/templates` | — | — | — | — | ✓ |
 | `GET/POST/PATCH/DELETE /api/admin/web-users` | — | — | — | — | ✓ |
 | `GET /api/admin/groups` | — | — | — | — | ✓ |
 

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/app/page";
+import TemplateEditorSheet from "@/components/TemplateEditorSheet";
 
 type Setting = { key: string; value: string };
 
@@ -28,9 +29,14 @@ type Merchant = {
   earnType: string;
   earnValue: number;
   commissionType: string;
+  commissionBasis: string;
   commissionValue: number;
   subscriptionFee: number;
   rebateValidityDays: number;
+  firstReminderDays: number;
+  secondReminderDays: number;
+  firstRecallCampaignDays: number;
+  secondRecallCampaignDays: number;
   redemptionGroupID: string | null;
   redemptionGroup: { groupName: string } | null;
 };
@@ -40,6 +46,31 @@ const SETTING_LABELS: Record<string, string> = {
   DEFAULT_BOT_TOKEN: "Default Telegram Bot Token",
   CASHBACK_APP_NAME: "App Name",
 };
+
+function ToggleGroup({ label, options, value, onChange }: {
+  label: string;
+  options: { value: string; label: string }[];
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div className="mb-4">
+      <p className="text-pan-muted text-xs uppercase tracking-widest font-bold mb-1">{label}</p>
+      <div className="flex gap-2">
+        {options.map((o) => (
+          <button
+            key={o.value}
+            onClick={() => onChange(o.value)}
+            className="flex-1 py-2 rounded-lg text-xs font-bold cursor-pointer transition-colors"
+            style={value === o.value ? { background: "#f0206a", color: "#fff" } : { background: "#1e2d5a", color: "#6b7fb0" }}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function AdminPage() {
   const router = useRouter();
@@ -54,6 +85,7 @@ export default function AdminPage() {
   const [saving, setSaving] = useState<string | null>(null);
   const [editMerchant, setEditMerchant] = useState<Merchant | null>(null);
   const [merchantSaving, setMerchantSaving] = useState(false);
+  const [templatesMerchantURL, setTemplatesMerchantURL] = useState<string | null>(null);
   const [newUser, setNewUser] = useState<{ username: string; password: string; role: "ADMIN" | "MERCHANT" | "CHANNEL_PARTNER"; merchantURL: string; redemptionGroupID: string; profitSharePct: string } | null>(null);
   const [newUserSaving, setNewUserSaving] = useState(false);
   const [resetUser, setResetUser] = useState<{ id: string; username: string; role: string; password: string; profitSharePct: string } | null>(null);
@@ -163,9 +195,29 @@ export default function AdminPage() {
     if (!editMerchant) return;
     setMerchantSaving(true);
     try {
+      // Send only scalar fields (no relation objects)
       await apiFetch("/api/admin/merchants", {
         method: "PATCH",
-        body: JSON.stringify(editMerchant),
+        body: JSON.stringify({
+          merchantURL: editMerchant.merchantURL,
+          merchantName: editMerchant.merchantName,
+          outletName: editMerchant.outletName,
+          merchantTelegramID: editMerchant.merchantTelegramID,
+          active: editMerchant.active,
+          botToken: editMerchant.botToken,
+          earnType: editMerchant.earnType,
+          earnValue: editMerchant.earnValue,
+          commissionType: editMerchant.commissionType,
+          commissionBasis: editMerchant.commissionBasis,
+          commissionValue: editMerchant.commissionValue,
+          subscriptionFee: editMerchant.subscriptionFee,
+          rebateValidityDays: editMerchant.rebateValidityDays,
+          firstReminderDays: editMerchant.firstReminderDays,
+          secondReminderDays: editMerchant.secondReminderDays,
+          firstRecallCampaignDays: editMerchant.firstRecallCampaignDays,
+          secondRecallCampaignDays: editMerchant.secondRecallCampaignDays,
+          redemptionGroupID: editMerchant.redemptionGroupID,
+        }),
       });
       await load();
       setEditMerchant(null);
@@ -265,15 +317,14 @@ export default function AdminPage() {
                 </span>
               </div>
               <p className="text-pan-muted text-xs mb-1">
-                Earn: {m.earnType === "PERCENTAGE" ? `${m.earnValue}%` : `Ks ${m.earnValue}`}
+                Earn: {m.earnType === "PERCENTAGE" ? `${m.earnValue}%` : `Ks ${m.earnValue} (fixed)`}
                 {" · "}
-                Commission: {m.commissionType === "PERCENTAGE" ? `${m.commissionValue}%` : `Ks ${m.commissionValue}`}
-                {" · "}
-                Sub: Ks {m.subscriptionFee}
+                Commission: {m.commissionType === "FLAT" ? `Ks ${m.commissionValue} flat` : `${m.commissionValue}% (${m.commissionBasis === "RETURN_TRANSACTION" ? "return" : "initial"})`}
               </p>
               <p className="text-pan-muted text-xs mb-3">
-                Bot: {m.botToken ? "Custom ✓" : "Default (PAN)"}{" "}
-                {m.redemptionGroup ? `· Group: ${m.redemptionGroup.groupName}` : ""}
+                Sub: Ks {m.subscriptionFee}
+                {m.redemptionGroup ? ` · Group: ${m.redemptionGroup.groupName}` : ""}
+                {m.botToken ? " · Custom bot" : ""}
               </p>
               <button
                 onClick={() => setEditMerchant({ ...m })}
@@ -476,35 +527,157 @@ export default function AdminPage() {
       {editMerchant && (
         <>
           <div className="fixed inset-0 z-40 bg-black/60" onClick={() => setEditMerchant(null)} />
-          <div className="fixed bottom-0 left-0 right-0 z-50 max-w-[480px] mx-auto rounded-t-2xl bg-pan-overlay px-5 pt-4 pb-10 shadow-2xl overflow-y-auto max-h-[85vh]">
+          <div className="fixed bottom-0 left-0 right-0 z-50 max-w-[480px] mx-auto rounded-t-2xl bg-pan-overlay px-5 pt-4 pb-10 shadow-2xl overflow-y-auto max-h-[90vh]">
             <div className="mx-auto mb-4 w-10 h-1 rounded-full bg-pan-border" />
-            <h2 className="text-lg font-bold text-white mb-4">Edit — {editMerchant.merchantName}</h2>
+            <h2 className="text-lg font-bold text-white mb-1">Edit Merchant</h2>
+            <p className="text-pan-muted text-xs mb-5">{editMerchant.merchantURL}</p>
 
-            {[
-              { label: "Earn Value", field: "earnValue", type: "number" },
-              { label: "Commission Value", field: "commissionValue", type: "number" },
-              { label: "Subscription Fee (Ks)", field: "subscriptionFee", type: "number" },
-              { label: "Rebate Validity (days)", field: "rebateValidityDays", type: "number" },
-              { label: "Bot Token (leave blank for PAN default)", field: "botToken", type: "text" },
-            ].map(({ label, field, type }) => (
+            {/* ── Section A: Merchant Setup ── */}
+            <p className="text-pan-gold text-xs font-bold uppercase tracking-widest mb-3">Merchant Setup</p>
+
+            {/* Merchant Telegram ID */}
+            <div className="mb-4">
+              <p className="text-pan-muted text-xs uppercase tracking-widest font-bold mb-1">Merchant Telegram ID</p>
+              <input
+                type="text"
+                value={editMerchant.merchantTelegramID}
+                onChange={(e) => setEditMerchant({ ...editMerchant, merchantTelegramID: e.target.value })}
+                placeholder="Telegram user ID of cashier/owner"
+                className="w-full bg-pan-card border border-pan-border rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-pan-pink"
+              />
+            </div>
+
+            {/* Earn type + value */}
+            <ToggleGroup
+              label="Earn Type"
+              options={[{ value: "PERCENTAGE", label: "%" }, { value: "FIXED", label: "Fixed Ks" }]}
+              value={editMerchant.earnType}
+              onChange={(v) => setEditMerchant({ ...editMerchant, earnType: v })}
+            />
+            <div className="mb-4">
+              <p className="text-pan-muted text-xs uppercase tracking-widest font-bold mb-1">
+                Earn Value {editMerchant.earnType === "PERCENTAGE" ? "(% of net purchase)" : "(fixed Ks per transaction)"}
+              </p>
+              <input
+                type="number" min="0" step="0.1"
+                value={editMerchant.earnValue}
+                onChange={(e) => setEditMerchant({ ...editMerchant, earnValue: Number(e.target.value) })}
+                className="w-full bg-pan-card border border-pan-border rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-pan-pink"
+              />
+            </div>
+
+            {/* Commission type + basis + value */}
+            <ToggleGroup
+              label="Commission Type"
+              options={[{ value: "PERCENTAGE", label: "%" }, { value: "FLAT", label: "Flat Ks" }]}
+              value={editMerchant.commissionType}
+              onChange={(v) => setEditMerchant({ ...editMerchant, commissionType: v })}
+            />
+            {editMerchant.commissionType === "PERCENTAGE" && (
+              <ToggleGroup
+                label="Commission Basis"
+                options={[
+                  { value: "RETURN_TRANSACTION", label: "Return Visit" },
+                  { value: "INITIAL_TRANSACTION", label: "Original Visit" },
+                ]}
+                value={editMerchant.commissionBasis}
+                onChange={(v) => setEditMerchant({ ...editMerchant, commissionBasis: v })}
+              />
+            )}
+            <div className="mb-4">
+              <p className="text-pan-muted text-xs uppercase tracking-widest font-bold mb-1">
+                {editMerchant.commissionType === "FLAT" ? "Commission (flat Ks)" : "Commission (% of gross purchase)"}
+              </p>
+              <input
+                type="number" min="0" step="0.1"
+                value={editMerchant.commissionValue}
+                onChange={(e) => setEditMerchant({ ...editMerchant, commissionValue: Number(e.target.value) })}
+                className="w-full bg-pan-card border border-pan-border rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-pan-pink"
+              />
+            </div>
+
+            {/* Other setup fields */}
+            {([
+              { label: "Subscription Fee (Ks/month)", field: "subscriptionFee" },
+              { label: "Cashback Validity (days)", field: "rebateValidityDays" },
+            ] as const).map(({ label, field }) => (
               <div key={field} className="mb-4">
                 <p className="text-pan-muted text-xs uppercase tracking-widest font-bold mb-1">{label}</p>
                 <input
-                  type={type}
-                  value={(editMerchant as Record<string, unknown>)[field] as string ?? ""}
-                  onChange={(e) => setEditMerchant({ ...editMerchant, [field]: type === "number" ? Number(e.target.value) : e.target.value || null })}
+                  type="number" min="0"
+                  value={editMerchant[field] as number}
+                  onChange={(e) => setEditMerchant({ ...editMerchant, [field]: Number(e.target.value) })}
                   className="w-full bg-pan-card border border-pan-border rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-pan-pink"
                 />
               </div>
             ))}
 
-            <div className="mb-5">
-              <p className="text-pan-muted text-xs uppercase tracking-widest font-bold mb-1">Active</p>
+            <div className="mb-4">
+              <p className="text-pan-muted text-xs uppercase tracking-widest font-bold mb-1">Bot Token (blank = PAN default)</p>
+              <input
+                type="text"
+                value={editMerchant.botToken ?? ""}
+                onChange={(e) => setEditMerchant({ ...editMerchant, botToken: e.target.value || null })}
+                placeholder="Leave blank to use PAN shared bot"
+                className="w-full bg-pan-card border border-pan-border rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-pan-pink"
+              />
+            </div>
+
+            <div className="mb-4">
+              <p className="text-pan-muted text-xs uppercase tracking-widest font-bold mb-1">Redemption Group</p>
+              <select
+                value={editMerchant.redemptionGroupID ?? ""}
+                onChange={(e) => setEditMerchant({ ...editMerchant, redemptionGroupID: e.target.value || null })}
+                className="w-full bg-pan-card border border-pan-border rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-pan-pink"
+              >
+                <option value="">— none (standalone) —</option>
+                {redemptionGroups.map((g) => (
+                  <option key={g.id} value={g.id}>{g.groupName}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="mb-6">
+              <p className="text-pan-muted text-xs uppercase tracking-widest font-bold mb-2">Status</p>
               <button
                 onClick={() => setEditMerchant({ ...editMerchant, active: !editMerchant.active })}
                 className={`px-4 py-2 rounded-lg text-sm font-bold cursor-pointer ${editMerchant.active ? "bg-green-900 text-green-400" : "bg-red-900/40 text-pan-pink"}`}
               >
                 {editMerchant.active ? "Active — tap to deactivate" : "Inactive — tap to activate"}
+              </button>
+            </div>
+
+            {/* ── Section B: Communication Setup ── */}
+            <div className="border-t border-pan-border pt-5 mb-5">
+              <p className="text-pan-gold text-xs font-bold uppercase tracking-widest mb-3">Communication Setup</p>
+
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                {([
+                  { label: "Reminder 1 (days before)", field: "firstReminderDays" },
+                  { label: "Reminder 2 (days before)", field: "secondReminderDays" },
+                  { label: "Win-back 1 (days since visit)", field: "firstRecallCampaignDays" },
+                  { label: "Win-back 2 (days since visit)", field: "secondRecallCampaignDays" },
+                ] as const).map(({ label, field }) => (
+                  <div key={field}>
+                    <p className="text-pan-muted text-xs font-bold mb-1">{label}</p>
+                    <input
+                      type="number" min="0"
+                      value={editMerchant[field] as number}
+                      onChange={(e) => setEditMerchant({ ...editMerchant, [field]: Number(e.target.value) })}
+                      className="w-full bg-pan-card border border-pan-border rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-pan-pink"
+                    />
+                  </div>
+                ))}
+              </div>
+
+              <button
+                onClick={() => {
+                  setEditMerchant(null);
+                  setTemplatesMerchantURL(editMerchant.merchantURL);
+                }}
+                className="w-full rounded-xl py-3 text-sm font-bold text-pan-muted border border-pan-border cursor-pointer"
+              >
+                ✉️ Edit Message Templates →
               </button>
             </div>
 
@@ -521,6 +694,15 @@ export default function AdminPage() {
             </div>
           </div>
         </>
+      )}
+
+      {/* Template editor — admin context for a specific merchant */}
+      {templatesMerchantURL && (
+        <TemplateEditorSheet
+          apiFetch={apiFetch}
+          adminMerchantURL={templatesMerchantURL}
+          onClose={() => setTemplatesMerchantURL(null)}
+        />
       )}
     </main>
   );
