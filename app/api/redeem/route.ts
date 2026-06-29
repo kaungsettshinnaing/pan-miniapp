@@ -9,11 +9,12 @@ export async function POST(request: Request) {
   try {
     // Body must be read before requireMerchantAccess (guards only read headers/cookies)
     const body = (await request.json()) as {
-      otpCode?: string;
+      otpCode?: string | number;
       purchaseAmount?: number;
       merchantURL?: string;
     };
-    const { otpCode, purchaseAmount } = body;
+    const otpCode = body.otpCode != null ? String(body.otpCode) : undefined;
+    const { purchaseAmount } = body;
 
     if (!otpCode || !purchaseAmount || purchaseAmount <= 0) {
       return err("otpCode and purchaseAmount are required", 400);
@@ -214,6 +215,7 @@ export async function POST(request: Request) {
       merchantName: merchant.merchantName,
       customerName,
       expiryDate: newCashbackAmt > 0 ? expiryDate.toISOString() : null,
+      expiryDateFormatted: newCashbackAmt > 0 ? formatDate(expiryDate) : null,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Unknown error";
