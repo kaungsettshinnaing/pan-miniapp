@@ -7,6 +7,7 @@ import EarnSheet, { type PreloadedSession } from "@/components/EarnSheet";
 import ProfileSheet from "@/components/ProfileSheet";
 import MerchantProcessSheet from "@/components/MerchantProcessSheet";
 import TemplateEditorSheet from "@/components/TemplateEditorSheet";
+import { translations, type Lang } from "@/lib/i18n";
 
 type Cashback = {
   id: string;
@@ -30,6 +31,7 @@ type ProfileData = {
   lastName?: string;
   username?: string;
   phoneNumber?: string;
+  birthday?: string | null;
   totalBalance: number;
   activeMerchants: number;
   timesRedeemed: number;
@@ -97,13 +99,27 @@ export default function Home() {
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [earnMerchant, setEarnMerchant] = useState<string | undefined>();
   const [preloadedSession, setPreloadedSession] = useState<PreloadedSession | undefined>();
+  const [lang, setLangState] = useState<Lang>("EN");
+
+  function setLang(l: Lang) {
+    setLangState(l);
+    if (typeof window !== "undefined") localStorage.setItem("pan_lang", l);
+  }
+
+  const t = translations[lang];
 
   const tgUser = typeof window !== "undefined"
     ? window.Telegram?.WebApp?.initDataUnsafe?.user
     : null;
-  const firstName = tgUser?.first_name ?? "there";
+  const displayName = profile?.firstName ?? tgUser?.first_name ?? "there";
 
   useEffect(() => {
+    // Restore language from localStorage
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("pan_lang") as Lang | null;
+      if (saved === "EN" || saved === "MM") setLangState(saved);
+    }
+
     const tg = window.Telegram?.WebApp;
     if (tg) {
       tg.ready();
@@ -112,6 +128,7 @@ export default function Home() {
     load();
     loadMerchantMeta();
     checkActiveSession();
+    refreshProfile();
 
     const handleVisibility = () => {
       if (document.visibilityState === "visible") load();
@@ -142,7 +159,7 @@ export default function Home() {
         setEarnOpen(true);
       }
     } catch {
-      // Non-critical — customer just won't see the auto-popup
+      // Non-critical
     }
   }
 
@@ -151,17 +168,21 @@ export default function Home() {
       const data = await apiFetch<MerchantMeta>("/api/merchant/me");
       setMerchantMeta(data);
     } catch {
-      // Non-fatal — user is just a customer
+      // Non-fatal
     }
   }
 
-  async function loadProfile() {
+  async function refreshProfile() {
     try {
       const data = await apiFetch<ProfileData>("/api/profile");
       setProfile(data);
     } catch {
-      // Non-fatal — show empty profile
+      // Non-fatal
     }
+  }
+
+  async function openProfile() {
+    await refreshProfile();
     setProfileOpen(true);
   }
 
@@ -172,40 +193,70 @@ export default function Home() {
 
   const isMerchant = merchantMeta?.isMerchant ?? false;
 
+  function LangToggle() {
+    return (
+      <div className="flex rounded-full border border-pan-border overflow-hidden text-xs font-bold">
+        <button
+          onClick={() => setLang("EN")}
+          className={`px-2.5 py-1 cursor-pointer transition-colors ${
+            lang === "EN" ? "text-white" : "text-pan-muted"
+          }`}
+          style={lang === "EN" ? { background: "linear-gradient(135deg, #f0206a 0%, #c01253 100%)" } : {}}
+        >
+          EN
+        </button>
+        <button
+          onClick={() => setLang("MM")}
+          className={`px-2.5 py-1 cursor-pointer transition-colors ${
+            lang === "MM" ? "text-white" : "text-pan-muted"
+          }`}
+          style={lang === "MM" ? { background: "linear-gradient(135deg, #f0206a 0%, #c01253 100%)" } : {}}
+        >
+          MM
+        </button>
+      </div>
+    );
+  }
+
   return (
     <main
       className="max-w-[480px] mx-auto min-h-screen bg-pan-navy px-4 pt-4"
       style={{ paddingBottom: isMerchant ? "96px" : "32px" }}
     >
       {/* Header */}
-      <header className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <div className="w-10 h-10 rounded-xl bg-pan-card flex items-center justify-center text-lg font-bold text-pan-pink">
-            ပ
-          </div>
-          <div>
-            <p className="text-[11px] text-pan-muted leading-tight">ပြန်အမ်းငွေ — Cashback</p>
-            <p className="text-[10px] text-pan-muted">Smart Cashback · Loyal Customers</p>
-          </div>
+      <header className="flex items-center justify-between mb-4 gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/logo.png"
+            alt="PAN"
+            className="w-10 h-10 object-contain flex-shrink-0 rounded-xl"
+          />
+          <p className="text-sm font-bold text-white truncate">
+            {t.welcomeBack}, {displayName}!
+          </p>
         </div>
-        <button onClick={loadProfile} className="text-right cursor-pointer">
-          <p className="text-[11px] text-pan-muted">Welcome back</p>
-          <p className="text-sm font-bold text-white">{firstName}</p>
-          <p className="text-[11px] text-pan-pink">My Profile →</p>
-        </button>
+        <div className="flex flex-col items-end gap-1 flex-shrink-0">
+          <LangToggle />
+          <button
+            onClick={openProfile}
+            className="text-[11px] text-pan-pink cursor-pointer whitespace-nowrap"
+          >
+            {t.myProfile}
+          </button>
+        </div>
       </header>
 
       {/* Customer Tab Content */}
       {tab === "customer" && (
         <>
-          {/* Balance Hero */}
           {loading ? (
             <div className="rounded-2xl bg-pan-card h-32 animate-pulse mb-4" />
           ) : error ? (
             <div className="rounded-2xl bg-pan-card p-4 mb-4 text-center">
               <p className="text-pan-muted text-sm mb-2">{error}</p>
               <button onClick={load} className="text-pan-pink text-sm font-bold">
-                Retry
+                {t.retry}
               </button>
             </div>
           ) : (
@@ -213,10 +264,10 @@ export default function Home() {
               totalBalance={balance?.totalBalance ?? 0}
               merchantCount={new Set(balance?.cashbacks.map((c) => c.merchantURL)).size}
               expiringCount={balance?.expiringCount ?? 0}
+              lang={lang}
             />
           )}
 
-          {/* Earn Cashback CTA */}
           <button
             onClick={() => openEarn()}
             className="w-full rounded-2xl py-4 font-bold text-lg text-white mb-6 cursor-pointer active:opacity-80 transition-opacity"
@@ -225,27 +276,25 @@ export default function Home() {
               boxShadow: "0 4px 16px rgba(240,32,106,0.4)",
             }}
           >
-            🏷️ Earn Cashback
+            {t.earnCashbackBtn}
           </button>
 
-          {/* Cashback List */}
           {!loading && !error && (
             <section>
               <p className="text-[13px] font-bold text-pan-muted uppercase tracking-wide mb-3">
-                Your Cashback
+                {t.yourCashback}
               </p>
               {balance?.cashbacks.length === 0 ? (
                 <div className="text-center py-12">
-                  <p className="text-pan-muted text-sm">No active cashback yet.</p>
-                  <p className="text-pan-muted text-xs mt-1">
-                    Visit a merchant and tap Earn Cashback to get started.
-                  </p>
+                  <p className="text-pan-muted text-sm">{t.noActiveCashback}</p>
+                  <p className="text-pan-muted text-xs mt-1">{t.noActiveCashbackHint}</p>
                 </div>
               ) : (
                 balance?.cashbacks.map((c) => (
                   <MerchantCard
                     key={c.id}
                     cashback={c}
+                    lang={lang}
                     onRedeem={() => openEarn(c.merchantURL)}
                   />
                 ))
@@ -258,24 +307,22 @@ export default function Home() {
       {/* Merchant Tab Content */}
       {tab === "merchant" && isMerchant && merchantMeta?.merchant && (
         <div className="pt-2">
-          {/* Merchant identity */}
           <div className="rounded-2xl bg-pan-card border border-pan-border px-4 py-4 mb-4">
             <p className="text-pan-muted text-xs uppercase tracking-widest font-bold mb-1">
-              Merchant Account
+              {t.merchantAccount}
             </p>
             <p className="text-white text-lg font-black">{merchantMeta.merchant.merchantName}</p>
             {merchantMeta.merchant.outletName && (
               <p className="text-pan-muted text-sm">{merchantMeta.merchant.outletName}</p>
             )}
             <p className="text-pan-gold text-xs mt-2 font-bold">
-              Earn:{" "}
+              {t.earnLabel}:{" "}
               {merchantMeta.merchant.earnType === "PERCENTAGE"
-                ? `${merchantMeta.merchant.earnValue}% cashback`
-                : `Ks ${merchantMeta.merchant.earnValue} fixed`}
+                ? t.percentageCashback(merchantMeta.merchant.earnValue)
+                : t.fixedCashback(merchantMeta.merchant.earnValue)}
             </p>
           </div>
 
-          {/* Process Redemption CTA */}
           <button
             onClick={() => setMerchantOpen(true)}
             className="w-full rounded-2xl py-5 font-bold text-lg text-white mb-4 cursor-pointer active:opacity-80 transition-opacity"
@@ -285,34 +332,25 @@ export default function Home() {
               boxShadow: "0 4px 16px rgba(240,32,106,0.2)",
             }}
           >
-            🔢 Process Redemption
-            <p className="text-pan-muted text-sm font-normal mt-1">
-              Enter customer PIN + purchase amount
-            </p>
+            {t.processRedemption}
+            <p className="text-pan-muted text-sm font-normal mt-1">{t.processRedemptionHint}</p>
           </button>
 
-          {/* Message templates */}
           <button
             onClick={() => setTemplatesOpen(true)}
             className="w-full rounded-2xl py-4 font-bold text-base text-white mb-4 cursor-pointer active:opacity-80 transition-opacity border border-pan-border bg-pan-card"
           >
-            ✉️ Customize Messages
-            <p className="text-pan-muted text-sm font-normal mt-0.5">
-              Edit Telegram messages sent to customers
-            </p>
+            {t.customizeMessages}
+            <p className="text-pan-muted text-sm font-normal mt-0.5">{t.customizeMessagesHint}</p>
           </button>
 
-          {/* Tip about backup channel */}
           <div className="rounded-xl bg-pan-card/60 border border-pan-border px-4 py-3">
-            <p className="text-pan-muted text-xs leading-relaxed">
-              💡 If this app is unavailable, customers can also redeem via the Telegram bot
-              — both channels hit the same database.
-            </p>
+            <p className="text-pan-muted text-xs leading-relaxed">{t.backupTip}</p>
           </div>
         </div>
       )}
 
-      {/* Bottom nav — only shown when user is also a merchant */}
+      {/* Bottom nav */}
       {isMerchant && (
         <nav className="fixed bottom-0 left-0 right-0 max-w-[480px] mx-auto bg-pan-overlay border-t border-pan-border flex z-30">
           <button
@@ -320,12 +358,8 @@ export default function Home() {
             className="flex-1 py-4 flex flex-col items-center gap-1 cursor-pointer transition-colors"
           >
             <span className="text-xl">{tab === "customer" ? "💰" : "👤"}</span>
-            <span
-              className={`text-[11px] font-bold ${
-                tab === "customer" ? "text-pan-pink" : "text-pan-muted"
-              }`}
-            >
-              My Cashback
+            <span className={`text-[11px] font-bold ${tab === "customer" ? "text-pan-pink" : "text-pan-muted"}`}>
+              {t.myCashbackTab}
             </span>
           </button>
           <div className="w-px bg-pan-border my-2" />
@@ -334,12 +368,8 @@ export default function Home() {
             className="flex-1 py-4 flex flex-col items-center gap-1 cursor-pointer transition-colors"
           >
             <span className="text-xl">🏪</span>
-            <span
-              className={`text-[11px] font-bold ${
-                tab === "merchant" ? "text-pan-pink" : "text-pan-muted"
-              }`}
-            >
-              Merchant
+            <span className={`text-[11px] font-bold ${tab === "merchant" ? "text-pan-pink" : "text-pan-muted"}`}>
+              {t.merchantTab}
             </span>
           </button>
         </nav>
@@ -350,6 +380,7 @@ export default function Home() {
         <EarnSheet
           initialMerchant={earnMerchant}
           preloadedSession={preloadedSession}
+          lang={lang}
           apiFetch={apiFetch}
           onClose={() => {
             setEarnOpen(false);
@@ -363,7 +394,11 @@ export default function Home() {
       {profileOpen && (
         <ProfileSheet
           profile={profile}
+          lang={lang}
+          setLang={setLang}
+          apiFetch={apiFetch}
           onClose={() => setProfileOpen(false)}
+          onSaved={refreshProfile}
         />
       )}
       {merchantOpen && merchantMeta?.merchant && (

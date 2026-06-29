@@ -37,6 +37,8 @@ type Merchant = {
   secondReminderDays: number;
   firstRecallCampaignDays: number;
   secondRecallCampaignDays: number;
+  reminderSendTime: string;
+  winbackSendTime: string;
   redemptionGroupID: string | null;
   redemptionGroup: { groupName: string } | null;
   channelPartnerID: string | null;
@@ -58,6 +60,7 @@ const BLANK_MERCHANT = {
   botToken: "",
   firstReminderDays: "", secondReminderDays: "",
   firstRecallCampaignDays: "", secondRecallCampaignDays: "",
+  reminderSendTime: "09:00", winbackSendTime: "17:00",
   redemptionGroupID: "", channelPartnerID: "",
 };
 
@@ -232,6 +235,8 @@ export default function AdminPage() {
           secondReminderDays: editMerchant.secondReminderDays,
           firstRecallCampaignDays: editMerchant.firstRecallCampaignDays,
           secondRecallCampaignDays: editMerchant.secondRecallCampaignDays,
+          reminderSendTime: editMerchant.reminderSendTime,
+          winbackSendTime: editMerchant.winbackSendTime,
           redemptionGroupID: editMerchant.redemptionGroupID,
           channelPartnerID: editMerchant.channelPartnerID,
         }),
@@ -269,6 +274,8 @@ export default function AdminPage() {
           ...(f.secondReminderDays ? { secondReminderDays: Number(f.secondReminderDays) } : {}),
           ...(f.firstRecallCampaignDays ? { firstRecallCampaignDays: Number(f.firstRecallCampaignDays) } : {}),
           ...(f.secondRecallCampaignDays ? { secondRecallCampaignDays: Number(f.secondRecallCampaignDays) } : {}),
+          reminderSendTime: f.reminderSendTime || "09:00",
+          winbackSendTime: f.winbackSendTime || "17:00",
           redemptionGroupID: f.redemptionGroupID || null,
           channelPartnerID: f.channelPartnerID || null,
         }),
@@ -746,12 +753,33 @@ export default function AdminPage() {
                 ))}
               </div>
 
+              <div className="grid grid-cols-2 gap-3 mt-3">
+                <div>
+                  <p className="text-pan-muted text-xs font-bold mb-1">Reminder time (GMT+6.5)</p>
+                  <input
+                    type="time"
+                    value={editMerchant.reminderSendTime}
+                    onChange={(e) => setEditMerchant({ ...editMerchant, reminderSendTime: e.target.value })}
+                    className="w-full bg-pan-card border border-pan-border rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-pan-pink"
+                  />
+                </div>
+                <div>
+                  <p className="text-pan-muted text-xs font-bold mb-1">Win-back time (GMT+6.5)</p>
+                  <input
+                    type="time"
+                    value={editMerchant.winbackSendTime}
+                    onChange={(e) => setEditMerchant({ ...editMerchant, winbackSendTime: e.target.value })}
+                    className="w-full bg-pan-card border border-pan-border rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-pan-pink"
+                  />
+                </div>
+              </div>
+
               <button
                 onClick={() => {
                   setEditMerchant(null);
                   setTemplatesMerchantURL(editMerchant.merchantURL);
                 }}
-                className="w-full rounded-xl py-3 text-sm font-bold text-pan-muted border border-pan-border cursor-pointer"
+                className="w-full rounded-xl py-3 text-sm font-bold text-pan-muted border border-pan-border cursor-pointer mt-4"
               >
                 ✉️ Edit Message Templates →
               </button>
@@ -935,6 +963,26 @@ export default function AdminPage() {
                     />
                   </div>
                 ))}
+              </div>
+              <div className="grid grid-cols-2 gap-3 mt-3">
+                <div>
+                  <p className="text-pan-muted text-xs font-bold mb-1">Reminder time (GMT+6.5)</p>
+                  <input
+                    type="time"
+                    value={newMerchant.reminderSendTime}
+                    onChange={(e) => setNewMerchant({ ...newMerchant, reminderSendTime: e.target.value })}
+                    className="w-full bg-pan-card border border-pan-border rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-pan-pink"
+                  />
+                </div>
+                <div>
+                  <p className="text-pan-muted text-xs font-bold mb-1">Win-back time (GMT+6.5)</p>
+                  <input
+                    type="time"
+                    value={newMerchant.winbackSendTime}
+                    onChange={(e) => setNewMerchant({ ...newMerchant, winbackSendTime: e.target.value })}
+                    className="w-full bg-pan-card border border-pan-border rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-pan-pink"
+                  />
+                </div>
               </div>
             </div>
 

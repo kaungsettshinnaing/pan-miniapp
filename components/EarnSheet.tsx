@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { translations, type Lang } from "@/lib/i18n";
 
 type EarnResult = {
   sessionId: string;
@@ -32,12 +33,14 @@ type ViewState = "input" | "otp" | "success" | "failed";
 type Props = {
   initialMerchant?: string;
   preloadedSession?: PreloadedSession;
+  lang: Lang;
   apiFetch: <T>(path: string, opts?: RequestInit) => Promise<T>;
   onClose: () => void;
   onSuccess: () => void;
 };
 
-export default function EarnSheet({ initialMerchant, preloadedSession, apiFetch, onClose, onSuccess }: Props) {
+export default function EarnSheet({ initialMerchant, preloadedSession, lang, apiFetch, onClose, onSuccess }: Props) {
+  const t = translations[lang];
   const [merchantCode, setMerchantCode] = useState(initialMerchant ?? "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -93,7 +96,6 @@ export default function EarnSheet({ initialMerchant, preloadedSession, apiFetch,
           setFinalMessage(data.customerMessage ?? null);
           setViewState("failed");
         } else if (data.status === "cancelled") {
-          // Cancelled from another session/device — just close
           onClose();
         }
       } catch {
@@ -128,7 +130,6 @@ export default function EarnSheet({ initialMerchant, preloadedSession, apiFetch,
 
   async function handleCancel() {
     if (result && secondsLeft > 0) {
-      // OTP still live — cancel it so cashier knows not to proceed
       setCancelling(true);
       try {
         await apiFetch("/api/earn/cancel", {
@@ -143,34 +144,29 @@ export default function EarnSheet({ initialMerchant, preloadedSession, apiFetch,
   }
 
   const expired = secondsLeft === 0 && result !== null && viewState === "otp";
+  const min = Math.floor(secondsLeft / 60);
+  const sec = String(secondsLeft % 60).padStart(2, "0");
 
   return (
     <>
-      {/* Backdrop — only closes on input state; during OTP require explicit Cancel */}
       <div
         className="fixed inset-0 z-40 bg-black/60 sheet-backdrop"
         onClick={viewState === "input" ? onClose : undefined}
       />
-
-      {/* Sheet */}
       <div className="fixed bottom-0 left-0 right-0 z-50 max-w-[480px] mx-auto rounded-t-2xl bg-pan-overlay px-5 pt-4 pb-8 shadow-2xl">
-        {/* Handle */}
         <div className="mx-auto mb-4 w-10 h-1 rounded-full bg-pan-border" />
 
-        {/* ── INPUT STATE ── */}
+        {/* INPUT */}
         {viewState === "input" && (
           <>
-            <h2 className="text-lg font-bold text-white mb-1">🏷️ Earn Cashback</h2>
-            <p className="text-pan-muted text-sm mb-5">
-              Enter the merchant code shown on the QR at the counter. This will
-              trigger the PAN redemption flow and generate your PIN.
-            </p>
+            <h2 className="text-lg font-bold text-white mb-1">{t.earnTitle}</h2>
+            <p className="text-pan-muted text-sm mb-5">{t.earnHint}</p>
 
             <input
               type="text"
               value={merchantCode}
               onChange={(e) => setMerchantCode(e.target.value)}
-              placeholder="e.g. QQHotpotBBQ"
+              placeholder={t.merchantCodePlaceholder}
               className="w-full rounded-xl bg-pan-card border border-pan-border px-4 py-3 text-white placeholder:text-pan-muted text-sm outline-none focus:border-pan-pink mb-3"
               autoFocus
               autoCapitalize="none"
@@ -184,7 +180,7 @@ export default function EarnSheet({ initialMerchant, preloadedSession, apiFetch,
                 onClick={onClose}
                 className="flex-1 rounded-xl py-3 text-sm font-bold text-pan-muted border border-pan-border cursor-pointer"
               >
-                Cancel
+                {t.cancel}
               </button>
               <button
                 onClick={() => submit()}
@@ -192,21 +188,18 @@ export default function EarnSheet({ initialMerchant, preloadedSession, apiFetch,
                 className="flex-1 rounded-xl py-3 text-sm font-bold text-white cursor-pointer active:opacity-80 disabled:opacity-40"
                 style={{ background: "linear-gradient(135deg, #f0206a 0%, #c01253 100%)" }}
               >
-                {loading ? "Loading…" : "Get My PIN →"}
+                {loading ? t.loading : t.getPinBtn}
               </button>
             </div>
           </>
         )}
 
-        {/* ── OTP STATE ── */}
+        {/* OTP */}
         {viewState === "otp" && result && (
           <>
-            <h2 className="text-lg font-bold text-white mb-1">🔢 Show PIN to Cashier</h2>
-            <p className="text-pan-muted text-sm mb-4">
-              Show the PIN below to the cashier and wait while they confirm.
-            </p>
+            <h2 className="text-lg font-bold text-white mb-1">{t.showPinTitle}</h2>
+            <p className="text-pan-muted text-sm mb-4">{t.showPinHint}</p>
 
-            {/* Merchant + amount summary */}
             <div className="flex justify-between items-center bg-pan-card rounded-xl px-4 py-3 mb-4">
               <span className="text-white font-bold text-sm">{result.merchantName}</span>
               <span className="text-pan-gold font-black font-latin">
@@ -214,16 +207,12 @@ export default function EarnSheet({ initialMerchant, preloadedSession, apiFetch,
               </span>
             </div>
 
-            {/* PIN box */}
             <div
               className="rounded-xl px-4 py-5 mb-3 text-center"
-              style={{
-                border: "2px dashed rgba(240,32,106,0.6)",
-                background: "rgba(240,32,106,0.05)",
-              }}
+              style={{ border: "2px dashed rgba(240,32,106,0.6)", background: "rgba(240,32,106,0.05)" }}
             >
               <p className="text-[11px] font-bold text-pan-pink uppercase tracking-widest mb-2">
-                Your Redemption PIN
+                {t.yourPin}
               </p>
               <p
                 className="font-black font-latin text-5xl tracking-[0.3em] text-white pin-pop"
@@ -232,43 +221,33 @@ export default function EarnSheet({ initialMerchant, preloadedSession, apiFetch,
                 {result.otpCode}
               </p>
               {!expired ? (
-                <p className="text-pan-muted text-xs mt-3">
-                  Waiting for cashier · expires in {Math.floor(secondsLeft / 60)}:
-                  {String(secondsLeft % 60).padStart(2, "0")}
-                </p>
+                <p className="text-pan-muted text-xs mt-3">{t.waitingCashier(min, sec)}</p>
               ) : (
-                <p className="text-pan-pink text-xs mt-3">
-                  ⚠️ PIN expired — please cancel and try again
-                </p>
+                <p className="text-pan-pink text-xs mt-3">{t.pinExpiredMsg}</p>
               )}
             </div>
 
-            <p className="text-center text-pan-muted text-xs mb-4">
-              ✨ Valid for this visit only — do not share
-            </p>
+            <p className="text-center text-pan-muted text-xs mb-4">{t.pinValidHint}</p>
 
             <button
               onClick={handleCancel}
               disabled={cancelling}
               className="w-full rounded-xl py-3 text-sm font-bold text-pan-muted border border-pan-border cursor-pointer disabled:opacity-50"
             >
-              {cancelling ? "Cancelling…" : "Cancel"}
+              {cancelling ? t.cancelling : t.cancel}
             </button>
           </>
         )}
 
-        {/* ── SUCCESS STATE ── */}
+        {/* SUCCESS */}
         {viewState === "success" && (
           <div className="text-center py-4">
             <div className="text-6xl mb-4">✅</div>
-            <h2 className="text-xl font-black text-white mb-3">Cashback Redeemed!</h2>
+            <h2 className="text-xl font-black text-white mb-3">{t.redeemedTitle}</h2>
             {finalMessage && (
               <div
                 className="rounded-xl px-4 py-4 mb-6 text-left"
-                style={{
-                  background: "rgba(34,197,94,0.08)",
-                  border: "1px solid rgba(34,197,94,0.25)",
-                }}
+                style={{ background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.25)" }}
               >
                 <p className="text-[13px] text-white leading-relaxed whitespace-pre-line">
                   {finalMessage.text}
@@ -280,23 +259,20 @@ export default function EarnSheet({ initialMerchant, preloadedSession, apiFetch,
               className="w-full rounded-xl py-3 text-sm font-bold text-white cursor-pointer active:opacity-80"
               style={{ background: "linear-gradient(135deg, #f0206a 0%, #c01253 100%)" }}
             >
-              Done
+              {t.done}
             </button>
           </div>
         )}
 
-        {/* ── FAILED / EXPIRED STATE ── */}
+        {/* FAILED */}
         {viewState === "failed" && (
           <div className="text-center py-4">
             <div className="text-6xl mb-4">⏰</div>
-            <h2 className="text-xl font-black text-white mb-3">PIN Expired</h2>
+            <h2 className="text-xl font-black text-white mb-3">{t.failedTitle}</h2>
             {finalMessage && (
               <div
                 className="rounded-xl px-4 py-4 mb-6 text-left"
-                style={{
-                  background: "rgba(240,32,106,0.08)",
-                  border: "1px solid rgba(240,32,106,0.25)",
-                }}
+                style={{ background: "rgba(240,32,106,0.08)", border: "1px solid rgba(240,32,106,0.25)" }}
               >
                 <p className="text-[13px] text-pan-muted leading-relaxed whitespace-pre-line">
                   {finalMessage.text}
@@ -307,7 +283,7 @@ export default function EarnSheet({ initialMerchant, preloadedSession, apiFetch,
               onClick={onClose}
               className="w-full rounded-xl py-3 text-sm font-bold text-pan-muted border border-pan-border cursor-pointer"
             >
-              Close
+              {t.close}
             </button>
           </div>
         )}

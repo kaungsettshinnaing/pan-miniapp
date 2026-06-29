@@ -40,6 +40,8 @@ export async function POST(request: Request) {
       secondReminderDays?: number;
       firstRecallCampaignDays?: number;
       secondRecallCampaignDays?: number;
+      reminderSendTime?: string;
+      winbackSendTime?: string;
       redemptionGroupID?: string | null;
       channelPartnerID?: string | null;
     };
@@ -68,6 +70,8 @@ export async function POST(request: Request) {
         ...(body.secondReminderDays !== undefined && { secondReminderDays: Number(body.secondReminderDays) }),
         ...(body.firstRecallCampaignDays !== undefined && { firstRecallCampaignDays: Number(body.firstRecallCampaignDays) }),
         ...(body.secondRecallCampaignDays !== undefined && { secondRecallCampaignDays: Number(body.secondRecallCampaignDays) }),
+        ...(body.reminderSendTime && { reminderSendTime: body.reminderSendTime }),
+        ...(body.winbackSendTime && { winbackSendTime: body.winbackSendTime }),
         redemptionGroupID: body.redemptionGroupID || null,
         channelPartnerID: body.channelPartnerID || null,
       },
@@ -101,6 +105,8 @@ export async function PATCH(request: Request) {
       secondReminderDays?: number;
       firstRecallCampaignDays?: number;
       secondRecallCampaignDays?: number;
+      reminderSendTime?: string;
+      winbackSendTime?: string;
       redemptionGroupID?: string | null;
       channelPartnerID?: string | null;
     };
@@ -111,6 +117,7 @@ export async function PATCH(request: Request) {
       earnType, earnValue, commissionType, commissionBasis, commissionValue,
       subscriptionFee, rebateValidityDays,
       firstReminderDays, secondReminderDays, firstRecallCampaignDays, secondRecallCampaignDays,
+      reminderSendTime, winbackSendTime,
       redemptionGroupID, channelPartnerID,
     } = body;
     const merchant = await prisma.merchant.update({
@@ -132,6 +139,8 @@ export async function PATCH(request: Request) {
         ...(secondReminderDays !== undefined && { secondReminderDays }),
         ...(firstRecallCampaignDays !== undefined && { firstRecallCampaignDays }),
         ...(secondRecallCampaignDays !== undefined && { secondRecallCampaignDays }),
+        ...(reminderSendTime !== undefined && { reminderSendTime }),
+        ...(winbackSendTime !== undefined && { winbackSendTime }),
         ...(redemptionGroupID !== undefined && { redemptionGroupID }),
         ...(channelPartnerID !== undefined && { channelPartnerID }),
       },

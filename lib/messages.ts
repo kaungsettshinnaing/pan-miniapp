@@ -29,6 +29,14 @@ const DEFAULTS: Partial<Record<MessageTriggerKey, string>> = {
     "⚠️ Your redemption at {{merchantName}} could not be completed. Please try again or ask the cashier for help.",
   REDEMPTION_CANCELLED:
     "😔 Your cashback redemption at {{merchantName}} was cancelled. Come visit us again soon!",
+  EXPIRY_FIRST_REMINDER:
+    "⏰ Reminder from {{merchantName}}! Your cashback of {{cashbackAmt}} expires in {{reminderDays}} days ({{expiryDate}}). Visit us soon to redeem it!",
+  EXPIRY_SECOND_REMINDER:
+    "🚨 Last chance! Your cashback of {{cashbackAmt}} at {{merchantName}} expires in just {{reminderDays}} days ({{expiryDate}}). Don't let it go to waste!",
+  FIRST_RECALL_CAMPAIGN:
+    "👋 Hi {{customerName}}, we miss you at {{merchantName}}! It's been a while since your last visit. Come back and earn more cashback.",
+  SECOND_RECALL_CAMPAIGN:
+    "💫 {{customerName}}, {{merchantName}} misses you! We'd love to see you again — your loyalty means everything to us.",
 };
 
 // `trigger` is echoed back so n8n (and anyone reading the webhook body) can see

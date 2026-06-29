@@ -1,3 +1,5 @@
+import { translations, type Lang } from "@/lib/i18n";
+
 type Cashback = {
   id: string;
   merchantURL: string;
@@ -10,6 +12,7 @@ type Cashback = {
 
 type Props = {
   cashback: Cashback;
+  lang: Lang;
   onRedeem: () => void;
 };
 
@@ -27,7 +30,8 @@ function formatDate(expiryDate: string): string {
   });
 }
 
-export default function MerchantCard({ cashback, onRedeem }: Props) {
+export default function MerchantCard({ cashback, lang, onRedeem }: Props) {
+  const t = translations[lang];
   const days = daysLeft(cashback.expiryDate);
   const isUrgent = days <= 3;
   const isWarning = days <= 7 && !isUrgent;
@@ -50,7 +54,7 @@ export default function MerchantCard({ cashback, onRedeem }: Props) {
                   : "bg-white/10 text-pan-muted"
               }`}
             >
-              {isUrgent ? "🔥" : isWarning ? "⏳" : "📅"} {days}d left
+              {isUrgent ? "🔥" : isWarning ? "⏳" : "📅"} {t.dLeft(days)}
             </span>
           )}
         </div>
@@ -59,7 +63,7 @@ export default function MerchantCard({ cashback, onRedeem }: Props) {
             Ks {cashback.cashbackAmt.toLocaleString("en-US")}
           </p>
           <p className="text-[11px] text-pan-muted mt-1">
-            Expires {formatDate(cashback.expiryDate)}
+            {t.expires} {formatDate(cashback.expiryDate)}
           </p>
         </div>
       </div>
@@ -75,9 +79,7 @@ export default function MerchantCard({ cashback, onRedeem }: Props) {
           backgroundColor: cashback.merchantActive ? undefined : "#2a3f6f",
         }}
       >
-        {cashback.merchantActive
-          ? `Redeem at ${cashback.merchantName} →`
-          : "Merchant currently inactive"}
+        {cashback.merchantActive ? t.redeemAt(cashback.merchantName) : t.merchantInactive}
       </button>
     </div>
   );

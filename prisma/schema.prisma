@@ -50,6 +50,9 @@ model Merchant {
   webUsers                 WebUser[]        @relation("MerchantLogin")
   channelPartnerID         String?
   channelPartner           WebUser?         @relation("ChannelPartnerMerchants", fields: [channelPartnerID], references: [id])
+  reminderSendTime         String           @default("09:00") // HH:MM in GMT+6.5 — hour n8n must fire for expiry reminders
+  winbackSendTime          String           @default("17:00") // HH:MM in GMT+6.5 — hour n8n must fire for win-back campaigns
+  notificationLogs         NotificationLog[]
   createdAt                DateTime         @default(now())
   updatedAt                DateTime         @updatedAt
 }
@@ -64,6 +67,7 @@ model Customer {
   cashbacks          Cashback[]
   purchases          Purchase[]
   otpSessions        OtpSession[]
+  notificationLogs   NotificationLog[]
   createdAt          DateTime   @default(now())
   updatedAt          DateTime   @updatedAt
 }
@@ -183,6 +187,18 @@ enum CommissionBasis {
 
 enum Platform {
   TELEGRAM
+}
+
+model NotificationLog {
+  id                 String         @id @default(cuid())
+  customerTelegramID String
+  merchantURL        String
+  trigger            MessageTrigger
+  sentAt             DateTime       @default(now())
+  customer           Customer       @relation(fields: [customerTelegramID], references: [customerTelegramID])
+  merchant           Merchant       @relation(fields: [merchantURL], references: [merchantURL])
+
+  @@index([customerTelegramID, merchantURL, trigger, sentAt])
 }
 
 enum MessageTrigger {
