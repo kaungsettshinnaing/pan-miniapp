@@ -174,17 +174,26 @@ export async function POST(request: Request) {
     // so the customer is notified no matter which path the cashier used to redeem
     // (n8n Telegram form OR the in-app merchant tab).
     const customerName = otp.customer.firstName ?? "Customer";
+    const hasPriorCashback = otp.totalCashback > 0;
     const customerMessage = await resolveMerchantMessage(
       merchant.merchantURL,
-      "CASHBACK_ISSUED_WITH_REDEMPTION",
-      {
-        redeemedAmt: formatKs(otp.totalCashback),
-        cashbackAmt: formatKs(newCashbackAmt),
-        purchaseAmount: formatKs(purchaseAmount),
-        expiryDate: formatDate(expiryDate),
-        merchantName: merchant.merchantName,
-        customerName,
-      }
+      hasPriorCashback ? "CASHBACK_ISSUED_WITH_REDEMPTION" : "CASHBACK_ISSUED_NO_PRIOR_BALANCE",
+      hasPriorCashback
+        ? {
+            redeemedAmt: formatKs(otp.totalCashback),
+            cashbackAmt: formatKs(newCashbackAmt),
+            purchaseAmount: formatKs(purchaseAmount),
+            expiryDate: formatDate(expiryDate),
+            merchantName: merchant.merchantName,
+            customerName,
+          }
+        : {
+            cashbackAmt: formatKs(newCashbackAmt),
+            purchaseAmount: formatKs(purchaseAmount),
+            expiryDate: formatDate(expiryDate),
+            merchantName: merchant.merchantName,
+            customerName,
+          }
     );
 
     // Store customerMessage on the OtpSession so the customer's mini-app can pick it
@@ -203,7 +212,7 @@ export async function POST(request: Request) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          event: "CASHBACK_ISSUED_WITH_REDEMPTION",
+          event: customerMessage.trigger,
           customerTelegramID,
           merchantURL: merchant.merchantURL,
           merchantName: merchant.merchantName,

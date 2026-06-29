@@ -11,7 +11,8 @@ type Template = {
 
 const TRIGGER_LABELS: Record<string, string> = {
   CASHBACK_ISSUED: "💰 Cashback Issued",
-  CASHBACK_ISSUED_WITH_REDEMPTION: "✅ Cashback Issued (after redemption)",
+  CASHBACK_ISSUED_WITH_REDEMPTION: "✅ Cashback Issued (returning customer)",
+  CASHBACK_ISSUED_NO_PRIOR_BALANCE: "🆕 Cashback Earned (first visit / no prior balance)",
   REDEMPTION_FAILURE: "❌ Redemption Failure",
   REDEMPTION_CANCELLED: "🚫 Redemption Cancelled",
   EXPIRY_FIRST_REMINDER: "⏰ Expiry Reminder #1",
@@ -38,6 +39,13 @@ const TRIGGER_VARS: Record<string, VarDef[]> = {
     { variable: "{{cashbackAmt}}", label: "New cashback earned" },
     { variable: "{{purchaseAmount}}", label: "Purchase amount" },
     { variable: "{{expiryDate}}", label: "New cashback expiry" },
+    { variable: "{{customerName}}", label: "Customer name" },
+  ],
+  CASHBACK_ISSUED_NO_PRIOR_BALANCE: [
+    { variable: "{{merchantName}}", label: "Merchant name" },
+    { variable: "{{cashbackAmt}}", label: "Cashback earned" },
+    { variable: "{{purchaseAmount}}", label: "Purchase amount" },
+    { variable: "{{expiryDate}}", label: "Cashback expiry" },
     { variable: "{{customerName}}", label: "Customer name" },
   ],
   REDEMPTION_FAILURE: [
