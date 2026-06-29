@@ -1,0 +1,608 @@
+{
+  "name": "UAT - PAN - App earn trigger",
+  "nodes": [
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "success-img-check",
+              "leftValue": "={{ $('Call Redeem API1').item.json.data.customerMessage?.imageURL }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        496,
+        128
+      ],
+      "id": "02420823-578a-4456-933a-81f7afdb1335",
+      "name": "Success Has Image?"
+    },
+    {
+      "parameters": {
+        "operation": "sendPhoto",
+        "chatId": "={{ $('Webhook').item.json.body.customerTelegramID }}",
+        "file": "={{ $('Call Redeem API1').item.json.data.customerMessage.imageURL }}",
+        "additionalFields": {
+          "caption": "={{ $('Call Redeem API1').item.json.data.customerMessage.text }}"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        736,
+        16
+      ],
+      "id": "29ddef5e-cbf0-42ea-898e-b329234db57e",
+      "name": "Customer Success (Photo)",
+      "webhookId": "3a82a9c2-2ac5-41c5-b534-0ac4103cb2e2",
+      "credentials": {
+        "telegramApi": {
+          "id": "vjliuOCYYRY2eaMq",
+          "name": "UAT PAN"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Webhook').item.json.body.customerTelegramID }}",
+        "text": "={{ $('Call Redeem API1').item.json.data.customerMessage.text }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        736,
+        224
+      ],
+      "id": "dbcabb82-352d-43b0-bfd0-8e6f5376ad41",
+      "name": "Customer Success (Text)",
+      "webhookId": "d4ad1119-d456-42fb-91d2-3380c2689518",
+      "credentials": {
+        "telegramApi": {
+          "id": "vjliuOCYYRY2eaMq",
+          "name": "UAT PAN"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "earn-img-check",
+              "leftValue": "={{ $('Webhook').item.json.body.customerMessage.imageURL }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -944,
+        240
+      ],
+      "id": "04f3f673-1896-4137-b02b-e465348b1dc3",
+      "name": "Earn Has Image?1"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Webhook').item.json.body.customerTelegramID }}",
+        "text": "={{ $('Webhook').item.json.body.customerMessage.text }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -720,
+        352
+      ],
+      "id": "952cff27-22a7-4bda-893e-d9d472f953d3",
+      "name": "Customer Earn (Text)1",
+      "webhookId": "b71e3645-f0c9-4e4e-a5c9-3a351ee34d70",
+      "credentials": {
+        "telegramApi": {
+          "id": "vjliuOCYYRY2eaMq",
+          "name": "UAT PAN"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "sendPhoto",
+        "chatId": "={{ $('Webhook').item.json.body.customerTelegramID }}",
+        "file": "={{ $('Webhook').item.json.body.customerMessage.imageURL }}",
+        "additionalFields": {
+          "caption": "={{ $('Webhook').item.json.body.customerMessage.text }}"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -720,
+        112
+      ],
+      "id": "c9f2cb68-a3a4-45d1-9cfa-609e4cea45ea",
+      "name": "Customer - Earn Image1",
+      "webhookId": "34c58801-daee-42e9-af5e-ba6232af042e",
+      "credentials": {
+        "telegramApi": {
+          "id": "vjliuOCYYRY2eaMq",
+          "name": "UAT PAN"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "chatId": "={{ $('Webhook').item.json.body.merchantTelegramID }}",
+        "message": "=🔔🔔🔔\n\nဆိုင်မှာ ဝယ်ယူသူ {{ $('Webhook').item.json.body.customerName }} က {{ $('Webhook').item.json.body.totalCashback }} ကျပ် ငွေပြန်အမ်းငွေကို ရယူဖို့ ကြိုးစားနေပါတယ်\n\nဝယ်ယူသူ၏ OTP ကို redeem ကို နှိပ်ပြီးနောက်​​ရိုက်ထည့်ပါ",
+        "responseType": "customForm",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "OTP",
+              "fieldType": "number",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Amount",
+              "fieldType": "number",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Note",
+              "fieldType": "textarea"
+            }
+          ]
+        },
+        "options": {
+          "messageButtonLabel": "Redeem",
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -464,
+        240
+      ],
+      "id": "340659cd-d192-4180-90ac-7555586f450f",
+      "name": "Notify Cashier",
+      "webhookId": "b79f3a23-72fe-4dd5-8f3d-84ffb98e6007",
+      "credentials": {
+        "telegramApi": {
+          "id": "vjliuOCYYRY2eaMq",
+          "name": "UAT PAN"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Webhook').item.json.body.appBaseURL }}/api/redeem",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-secret",
+              "value": "68a089fb9c0d7643610f5ae05842e12cd525892a917037a0ef9bd298293663b1"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "otpCode",
+              "value": "={{ $json.data.OTP }}"
+            },
+            {
+              "name": "purchaseAmount",
+              "value": "={{ $json.data.Amount }}"
+            },
+            {
+              "name": "merchantURL",
+              "value": "={{ $('Webhook').item.json.body.merchantURL }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -224,
+        240
+      ],
+      "id": "f983afa0-3dc6-45d7-9ed8-8f85474e6a2d",
+      "name": "Call Redeem API1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "check-ok",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        16,
+        240
+      ],
+      "id": "81599590-2162-48a7-b8b3-db4206f0447a",
+      "name": "Success?"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Webhook').item.json.body.merchantTelegramID }}",
+        "text": "=🎉🎉🎉​\n\n✅ ဂုဏ်ယူပါတယ်ရှင်။\n\n{{ $('Call Redeem API1').item.json.data.customerName }} ရဲ့ ပြန်အမ်းငွေ - Cashback {{ $('Call Redeem API1').item.json.data.redeemedAmount }} ကျပ် ပြန်လည်ထုတ်ယူမှု အောင်မြင်ပါတယ်ရှင်။\n\n{{ $json.data.expiryDateFormatted }} တွင် ကုန်ဆုံးမည့် ပြန်အမ်းငွေ - Cashback {{ $('Call Redeem API1').item.json.data.newCashbackAmt }} ကျပ်ကိုလည်း နောက်တစ်ကြိမ်သုံးဖို့ ပေးထားပါတယ်ရှင်။",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        256,
+        128
+      ],
+      "id": "8deda16a-cc5a-4de5-b5aa-347e638dea94",
+      "name": "Cashier Success1",
+      "webhookId": "0f9eddf8-9f8e-44ae-a67d-70c0987104b7",
+      "credentials": {
+        "telegramApi": {
+          "id": "vjliuOCYYRY2eaMq",
+          "name": "UAT PAN"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Webhook').item.json.body.merchantTelegramID }}",
+        "text": "=❌❌❌\n\n​စိတ်မကောင်းပါဘူးရှင်။ 🙏✨\n\nဝယ်ယူသူ {{ $('Webhook').item.json.body.customerName }} မှ ပြန်အမ်းငွေ - Cashback ပမာဏ {{ $('Webhook').item.json.body.totalCashback }} ကျပ် ထုတ်ယူရန် ကြိုးစားမှုသည် OTP ကုဒ် မှားယွင်းနေပါသဖြင့် မအောင်မြင်ပါရှင်။\n\nဝယ်ယူသူအား ဆိုင်ရဲ့ သီးသန့်ကုဒ် (Merchant Code) လေးကို ထပ်ပေးပို့ပေးရန် ပြောပေးပါ။",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        256,
+        512
+      ],
+      "id": "987133bb-8e74-4d90-9fcc-cedaa7c576be",
+      "name": "Cashier Error1",
+      "webhookId": "1d9e2756-39fa-4a67-b745-df629bbd2815",
+      "credentials": {
+        "telegramApi": {
+          "id": "vjliuOCYYRY2eaMq",
+          "name": "UAT PAN"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "fail-img-check",
+              "leftValue": "={{ $('Call Redeem API1').item.json.customerMessage?.imageURL }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        496,
+        512
+      ],
+      "id": "393625cc-07af-4653-992d-bc0fdc72b169",
+      "name": "Fail Has Image?1"
+    },
+    {
+      "parameters": {
+        "operation": "sendPhoto",
+        "chatId": "={{ $('Webhook').item.json.body.customerTelegramID }}",
+        "file": "={{ $('Call Redeem API1').item.json.customerMessage.imageURL }}",
+        "additionalFields": {
+          "caption": "={{ $('Call Redeem API1').item.json.customerMessage.text }}"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        736,
+        432
+      ],
+      "id": "048b7fbe-ce0e-4a57-bebc-a7122c485722",
+      "name": "Customer Fail (Photo)1",
+      "webhookId": "5c65b607-7a77-47a5-a4c1-13b474eefd3f",
+      "credentials": {
+        "telegramApi": {
+          "id": "vjliuOCYYRY2eaMq",
+          "name": "UAT PAN"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Webhook').item.json.body.customerTelegramID }}",
+        "text": "={{ $('Call Redeem API1').item.json.customerMessage?.text || 'Your redemption could not be completed. Please try again.' }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        736,
+        592
+      ],
+      "id": "18c77fca-6ffd-4b2e-adae-7bc6e40f4843",
+      "name": "Customer Fail (Text)1",
+      "webhookId": "c321bea7-2d57-4431-af3e-75d6de97467a",
+      "credentials": {
+        "telegramApi": {
+          "id": "vjliuOCYYRY2eaMq",
+          "name": "UAT PAN"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "pan-merchant-notify",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1184,
+        240
+      ],
+      "id": "025bbc87-219f-4345-a52b-76c32cdc3e77",
+      "name": "Webhook",
+      "webhookId": "1d27a919-10cb-493f-9afe-e7ada10ee3dc"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Success Has Image?": {
+      "main": [
+        [
+          {
+            "node": "Customer Success (Photo)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Customer Success (Text)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Earn Has Image?1": {
+      "main": [
+        [
+          {
+            "node": "Customer - Earn Image1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Customer Earn (Text)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Customer Earn (Text)1": {
+      "main": [
+        [
+          {
+            "node": "Notify Cashier",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Customer - Earn Image1": {
+      "main": [
+        [
+          {
+            "node": "Notify Cashier",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Cashier": {
+      "main": [
+        [
+          {
+            "node": "Call Redeem API1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Redeem API1": {
+      "main": [
+        [
+          {
+            "node": "Success?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Success?": {
+      "main": [
+        [
+          {
+            "node": "Cashier Success1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Cashier Error1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cashier Success1": {
+      "main": [
+        [
+          {
+            "node": "Success Has Image?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cashier Error1": {
+      "main": [
+        [
+          {
+            "node": "Fail Has Image?1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fail Has Image?1": {
+      "main": [
+        [
+          {
+            "node": "Customer Fail (Photo)1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Customer Fail (Text)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Earn Has Image?1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "ee02c9d2-ff56-45ff-a92d-ade9449e51a1",
+  "meta": {
+    "instanceId": "b4d61e6aac32db40bf6501d2d4b51d8e89fd170203b484a7728d624bfefd6fd0"
+  },
+  "id": "0yL4IP6EKqUJhrN4",
+  "tags": []
+}

@@ -1,0 +1,279 @@
+{
+  "name": "UAT - PAN - Cashback Reminder",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours"
+            }
+          ]
+        }
+      },
+      "id": "a7350fa4-b817-440d-b86d-491ad01ceed0",
+      "name": "Every Hour",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -720,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://uat.cashbackapp.cloud/api/notifications/reminders",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-secret",
+              "value": "68a089fb9c0d7643610f5ae05842e12cd525892a917037a0ef9bd298293663b1"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "051160d5-3bfb-49ba-a02e-68f7a35d882d",
+      "name": "Get Due Reminders",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -480,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "check-ok",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "check-data",
+              "leftValue": "={{ $json.data.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "61895bd0-593c-4951-ab53-176c718d5688",
+      "name": "Has Reminders?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.1,
+      "position": [
+        -240,
+        128
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "12039284-66c2-4025-aa4c-5273b31472da",
+      "name": "No Reminders Today",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        -16,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "data",
+        "options": {}
+      },
+      "id": "1debf31c-2613-4e99-8131-dd985cd55792",
+      "name": "Split Notifications",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -16,
+        -64
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "has-image",
+              "leftValue": "={{ $json.customerMessage.imageURL }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "0d131c9f-44b2-4df0-8464-5bdf957227c0",
+      "name": "Has Image?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.1,
+      "position": [
+        224,
+        -64
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.customerTelegramID }}",
+        "text": "={{ $json.customerMessage.text }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "cd4effad-69a6-4af8-9e10-25909ef96ebf",
+      "name": "Send Reminder (Photo)",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        464,
+        -176
+      ],
+      "webhookId": "0463e5b8-e883-4a47-95b9-eaa51bfb3706",
+      "credentials": {
+        "telegramApi": {
+          "id": "vjliuOCYYRY2eaMq",
+          "name": "UAT PAN"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.customerTelegramID }}",
+        "text": "={{ $json.customerMessage.text }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "0a9e32c4-d9e4-43f7-8c98-4ccd330820c3",
+      "name": "Send Reminder (Text)",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        464,
+        64
+      ],
+      "webhookId": "22086168-ffad-4907-a1ec-78bce8187499",
+      "credentials": {
+        "telegramApi": {
+          "id": "vjliuOCYYRY2eaMq",
+          "name": "UAT PAN"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Every Hour": {
+      "main": [
+        [
+          {
+            "node": "Get Due Reminders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Due Reminders": {
+      "main": [
+        [
+          {
+            "node": "Has Reminders?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Reminders?": {
+      "main": [
+        [
+          {
+            "node": "Split Notifications",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Reminders Today",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Notifications": {
+      "main": [
+        [
+          {
+            "node": "Has Image?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Image?": {
+      "main": [
+        [
+          {
+            "node": "Send Reminder (Photo)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Reminder (Text)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "6486b55d-cb3f-4d19-9dca-e67e74ed89df",
+  "meta": {
+    "instanceId": "b4d61e6aac32db40bf6501d2d4b51d8e89fd170203b484a7728d624bfefd6fd0"
+  },
+  "id": "D4PfBIgTlLS01Tq3",
+  "tags": []
+}

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import TemplateEditorSheet from "@/components/TemplateEditorSheet";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Merchant = {
@@ -35,6 +36,14 @@ type Purchase = {
 type EarningsMonth = { month: string; commission: number; myShare: number };
 type Earnings = { months: EarningsMonth[]; totalCommission: number; myShare: number; profitSharePct: number };
 
+type TxSummary = {
+  merchantURL: string;
+  merchantName: string;
+  outletName: string | null;
+  redemptions: number;
+  issued: number;
+};
+
 // ── apiFetch ─────────────────────────────────────────────────────────────────
 async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, { ...init, headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) } });
@@ -45,6 +54,7 @@ async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
 
 function fmtKs(n: number) { return `Ks ${n.toLocaleString()}`; }
 function fmtPct(n: number) { return `${n}%`; }
+function todayISO() { return new Date().toISOString().split("T")[0]; }
 
 // ── Blank merchant form ───────────────────────────────────────────────────────
 const BLANK_FORM = {
@@ -57,7 +67,7 @@ const BLANK_FORM = {
 export default function CPPage() {
   const router = useRouter();
   const [username, setUsername] = useState("");
-  const [tab, setTab] = useState<"merchants" | "activity" | "earnings">("merchants");
+  const [tab, setTab] = useState<"merchants" | "activity" | "earnings" | "summary">("merchants");
 
   const [merchants, setMerchants] = useState<Merchant[]>([]);
   const [activity, setActivity] = useState<Purchase[]>([]);
@@ -70,6 +80,14 @@ export default function CPPage() {
   const [onboardOpen, setOnboardOpen] = useState(false);
   const [form, setForm] = useState(BLANK_FORM);
   const [formSaving, setFormSaving] = useState(false);
+
+  // Templates sheet
+  const [templateMerchantURL, setTemplateMerchantURL] = useState<string | null>(null);
+
+  // Daily summary
+  const [txDate, setTxDate] = useState(todayISO());
+  const [transactions, setTransactions] = useState<TxSummary[] | null>(null);
+  const [txLoading, setTxLoading] = useState(false);
 
   useEffect(() => { init(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -98,6 +116,28 @@ export default function CPPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function loadTransactions(date: string) {
+    setTxLoading(true);
+    try {
+      const data = await apiFetch<TxSummary[]>(`/api/cp/transactions?date=${date}`);
+      setTransactions(data);
+    } catch {
+      setTransactions([]);
+    } finally {
+      setTxLoading(false);
+    }
+  }
+
+  function switchTab(t: typeof tab) {
+    setTab(t);
+    if (t === "summary" && transactions === null) loadTransactions(txDate);
+  }
+
+  function changeDate(date: string) {
+    setTxDate(date);
+    loadTransactions(date);
   }
 
   async function logout() {
@@ -179,13 +219,18 @@ export default function CPPage() {
         ))}
       </div>
 
-      {/* Tabs */}
-      <div className="flex bg-pan-card rounded-xl p-1 mb-4">
-        {(["merchants", "activity", "earnings"] as const).map(t => (
-          <button key={t} onClick={() => setTab(t)}
-            className="flex-1 py-2 rounded-lg text-xs font-bold cursor-pointer transition-colors capitalize"
-            style={tab === t ? { background: "#f0206a", color: "#fff" } : { color: "#6b7fb0" }}>
-            {t === "merchants" ? "🏪 Merchants" : t === "activity" ? "📋 Activity" : "💰 Earnings"}
+      {/* Tabs — 2×2 grid to keep labels readable on mobile */}
+      <div className="grid grid-cols-2 gap-1 bg-pan-card rounded-xl p-1 mb-4">
+        {([
+          { key: "merchants", label: "🏪 Merchants" },
+          { key: "activity",  label: "📋 Activity"  },
+          { key: "earnings",  label: "💰 Earnings"  },
+          { key: "summary",   label: "📊 Daily"     },
+        ] as const).map(({ key, label }) => (
+          <button key={key} onClick={() => switchTab(key)}
+            className="py-2 rounded-lg text-xs font-bold cursor-pointer transition-colors"
+            style={tab === key ? { background: "#f0206a", color: "#fff" } : { color: "#6b7fb0" }}>
+            {label}
           </button>
         ))}
       </div>
@@ -215,10 +260,16 @@ export default function CPPage() {
                 {" · "}Commission: {m.commissionType === "PERCENTAGE" ? fmtPct(m.commissionValue) : fmtKs(m.commissionValue)}
                 {" · "}{m._count.purchases} redemptions
               </p>
-              <button onClick={() => setEditMerchant({ ...m })}
-                className="w-full rounded-lg py-2 text-xs font-bold text-pan-muted border border-pan-border cursor-pointer">
-                Edit settings →
-              </button>
+              <div className="flex gap-2">
+                <button onClick={() => setEditMerchant({ ...m })}
+                  className="flex-1 rounded-lg py-2 text-xs font-bold text-pan-muted border border-pan-border cursor-pointer">
+                  ⚙️ Settings
+                </button>
+                <button onClick={() => setTemplateMerchantURL(m.merchantURL)}
+                  className="flex-1 rounded-lg py-2 text-xs font-bold text-pan-muted border border-pan-border cursor-pointer">
+                  ✉️ Messages
+                </button>
+              </div>
             </div>
           ))}
           {merchants.length === 0 && <p className="text-center text-pan-muted text-sm py-6">No merchants yet — onboard your first one.</p>}
@@ -274,6 +325,68 @@ export default function CPPage() {
             </div>
           ))}
           {earnings.months.length === 0 && <p className="text-center text-pan-muted text-sm py-4">No earnings yet.</p>}
+        </div>
+      )}
+
+      {/* ── Daily Summary tab ── */}
+      {tab === "summary" && (
+        <div>
+          {/* Date picker */}
+          <div className="flex items-center gap-3 mb-4">
+            <label className="text-pan-muted text-xs font-bold uppercase tracking-widest whitespace-nowrap">Date</label>
+            <input
+              type="date"
+              value={txDate}
+              max={todayISO()}
+              onChange={e => { if (e.target.value) changeDate(e.target.value); }}
+              className="flex-1 bg-pan-card border border-pan-border rounded-xl px-3 py-2 text-white text-sm outline-none focus:border-pan-pink [color-scheme:dark]"
+            />
+          </div>
+
+          {txLoading ? (
+            <div className="space-y-2">
+              {[1,2,3].map(i => <div key={i} className="h-16 rounded-xl bg-pan-card animate-pulse" />)}
+            </div>
+          ) : transactions && transactions.length > 0 ? (
+            <>
+              {/* Column headers */}
+              <div className="flex items-center px-4 mb-1">
+                <p className="flex-1 text-pan-muted text-[10px] font-bold uppercase tracking-widest">Merchant</p>
+                <p className="w-20 text-right text-pan-muted text-[10px] font-bold uppercase tracking-widest">Redeemed</p>
+                <p className="w-20 text-right text-pan-muted text-[10px] font-bold uppercase tracking-widest">Issued</p>
+              </div>
+              <div className="space-y-2">
+                {transactions.map(tx => (
+                  <div key={tx.merchantURL} className="rounded-xl bg-pan-card border border-pan-border px-4 py-3 flex items-center">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white text-sm font-bold truncate">{tx.merchantName}</p>
+                      {tx.outletName && <p className="text-pan-muted text-xs truncate">{tx.outletName}</p>}
+                    </div>
+                    <div className="w-20 text-right">
+                      <p className="text-white font-black text-base">{tx.redemptions}</p>
+                      <p className="text-pan-muted text-[10px]">redemptions</p>
+                    </div>
+                    <div className="w-20 text-right">
+                      <p className="font-black text-base" style={{ color: "#f0b429" }}>{tx.issued}</p>
+                      <p className="text-pan-muted text-[10px]">issued</p>
+                    </div>
+                  </div>
+                ))}
+                {/* Totals row */}
+                <div className="rounded-xl border border-pan-border px-4 py-3 flex items-center" style={{ background: "rgba(240,32,106,0.06)", borderColor: "rgba(240,32,106,0.3)" }}>
+                  <p className="flex-1 text-white text-sm font-black">Total</p>
+                  <div className="w-20 text-right">
+                    <p className="text-white font-black text-base">{transactions.reduce((s, t) => s + t.redemptions, 0)}</p>
+                  </div>
+                  <div className="w-20 text-right">
+                    <p className="font-black text-base" style={{ color: "#f0b429" }}>{transactions.reduce((s, t) => s + t.issued, 0)}</p>
+                  </div>
+                </div>
+              </div>
+            </>
+          ) : transactions !== null ? (
+            <p className="text-center text-pan-muted text-sm py-10">No transactions on this date.</p>
+          ) : null}
         </div>
       )}
 
@@ -394,7 +507,7 @@ export default function CPPage() {
             <div className="mx-auto mb-4 w-10 h-1 rounded-full bg-pan-border" />
             <h2 className="text-lg font-bold text-white mb-4">Onboard Merchant</h2>
             {([
-              { label: "Merchant URL (unique ID / slug)", field: "merchantURL", type: "text", hint: "e.g. MyShop — used in QR code" },
+              { label: "Merchant URL (unique ID / slug)", field: "merchantURL", type: "text" },
               { label: "Business Name", field: "merchantName", type: "text" },
               { label: "Outlet Name (optional)", field: "outletName", type: "text" },
               { label: "Cashier Telegram ID (optional)", field: "merchantTelegramID", type: "text" },
@@ -471,6 +584,15 @@ export default function CPPage() {
             </div>
           </div>
         </>
+      )}
+
+      {/* ── Template editor sheet ── */}
+      {templateMerchantURL && (
+        <TemplateEditorSheet
+          apiFetch={apiFetch}
+          cpMerchantURL={templateMerchantURL}
+          onClose={() => setTemplateMerchantURL(null)}
+        />
       )}
     </main>
   );

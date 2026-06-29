@@ -76,9 +76,10 @@ type Props = {
   apiFetch: <T>(path: string, opts?: RequestInit) => Promise<T>;
   onClose: () => void;
   adminMerchantURL?: string;
+  cpMerchantURL?: string;
 };
 
-export default function TemplateEditorSheet({ apiFetch, onClose, adminMerchantURL }: Props) {
+export default function TemplateEditorSheet({ apiFetch, onClose, adminMerchantURL, cpMerchantURL }: Props) {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<string | null>(null);
@@ -88,6 +89,8 @@ export default function TemplateEditorSheet({ apiFetch, onClose, adminMerchantUR
 
   const getUrl = adminMerchantURL
     ? `/api/admin/templates?merchantURL=${encodeURIComponent(adminMerchantURL)}`
+    : cpMerchantURL
+    ? `/api/cp/templates?merchantURL=${encodeURIComponent(cpMerchantURL)}`
     : "/api/merchant/templates";
 
   useEffect(() => { loadTemplates(); }, []);
@@ -116,9 +119,15 @@ export default function TemplateEditorSheet({ apiFetch, onClose, adminMerchantUR
     if (!selected) return;
     setSaving(true);
     try {
-      const putUrl = adminMerchantURL ? "/api/admin/templates" : "/api/merchant/templates";
+      const putUrl = adminMerchantURL
+        ? "/api/admin/templates"
+        : cpMerchantURL
+        ? "/api/cp/templates"
+        : "/api/merchant/templates";
       const putBody = adminMerchantURL
         ? { merchantURL: adminMerchantURL, trigger: selected, messageText: form.messageText || null, imageURL: form.imageURL || null }
+        : cpMerchantURL
+        ? { merchantURL: cpMerchantURL, trigger: selected, messageText: form.messageText || null, imageURL: form.imageURL || null }
         : { trigger: selected, messageText: form.messageText || null, imageURL: form.imageURL || null };
       await apiFetch(putUrl, { method: "PUT", body: JSON.stringify(putBody) });
       await loadTemplates();

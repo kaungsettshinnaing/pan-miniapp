@@ -1,0 +1,180 @@
+{
+  "name": "UAT - PAN - Bot Earn Trigger",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -416,
+        -64
+      ],
+      "id": "a9d836a1-fd2a-4e3d-8e12-1553bccd2800",
+      "name": "Bot Message",
+      "webhookId": "pan-bot-earn-trigger",
+      "credentials": {
+        "telegramApi": {
+          "id": "vjliuOCYYRY2eaMq",
+          "name": "UAT PAN"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://uat.cashbackapp.cloud/api/earn",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-secret",
+              "value": "68a089fb9c0d7643610f5ae05842e12cd525892a917037a0ef9bd298293663b1"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "merchantURL",
+              "value": "={{ $json.message.text.trim() }}"
+            },
+            {
+              "name": "customerTelegramID",
+              "value": "={{ $json.message.from.id }}"
+            },
+            {
+              "name": "customerName",
+              "value": "={{ $json.message.from.first_name }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -176,
+        -64
+      ],
+      "id": "8b0ce30e-4a39-4bdd-8cad-70590a0272e5",
+      "name": "Call Earn API"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "earn-ok",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        64,
+        -64
+      ],
+      "id": "0fb20b2a-81dd-4a8e-9ac3-cb25f12b6c37",
+      "name": "Earn OK?"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Bot Message').item.json.message.from.id }}",
+        "text": "=❌ {{ $('Call Earn API').item.json.error || 'Something went wrong. Please try again.' }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        304,
+        64
+      ],
+      "id": "297f8645-7401-4926-995c-f57cc890884c",
+      "name": "Send Error to Customer",
+      "webhookId": "dc5d9ba4-6d30-4708-bec8-3ebd97f1a07d",
+      "credentials": {
+        "telegramApi": {
+          "id": "vjliuOCYYRY2eaMq",
+          "name": "UAT PAN"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Bot Message": {
+      "main": [
+        [
+          {
+            "node": "Call Earn API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Earn API": {
+      "main": [
+        [
+          {
+            "node": "Earn OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Earn OK?": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Send Error to Customer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "bdbd0c43-3a24-4435-b33b-10e4a2fd3fb5",
+  "meta": {
+    "instanceId": "b4d61e6aac32db40bf6501d2d4b51d8e89fd170203b484a7728d624bfefd6fd0"
+  },
+  "id": "7LNtDc3IXFsXP2Jg",
+  "tags": []
+}

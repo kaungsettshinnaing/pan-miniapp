@@ -1,0 +1,279 @@
+{
+  "name": "UAT - PAN - Winback campaigns",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours"
+            }
+          ]
+        }
+      },
+      "id": "0af816d0-9cc0-470e-9337-5a8b7eb93ad7",
+      "name": "Every Hour",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -720,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://uat.cashbackapp.cloud/api/notifications/winback",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-secret",
+              "value": "68a089fb9c0d7643610f5ae05842e12cd525892a917037a0ef9bd298293663b1"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "949ff92f-ea28-40fd-a6e7-e910c6ca71b9",
+      "name": "Get Due Win-backs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -480,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "check-ok",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "check-data",
+              "leftValue": "={{ $json.data.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "3d2f2a9b-e610-468d-ac9d-ab4a78d350ce",
+      "name": "Has Win-backs?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.1,
+      "position": [
+        -240,
+        128
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "b980e2ad-cbfe-4b69-b856-2e91b3cf22ce",
+      "name": "No Win-backs Today",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        32,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "data",
+        "options": {}
+      },
+      "id": "1d3d90fb-7c9a-467f-9969-9727fe8ad022",
+      "name": "Split Notifications",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        32,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "has-image",
+              "leftValue": "={{ $json.customerMessage.imageURL }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "805b7558-6557-4177-b8c8-b3f20f3e2acb",
+      "name": "Has Image?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.1,
+      "position": [
+        272,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.customerTelegramID }}",
+        "text": "={{ $json.customerMessage.text }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "de62b927-ebea-415e-8392-1526f3ea1d2c",
+      "name": "Send Win-back (Photo)",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        512,
+        -192
+      ],
+      "webhookId": "011525e3-7ee5-4d8f-bc62-96f86a86696a",
+      "credentials": {
+        "telegramApi": {
+          "id": "vjliuOCYYRY2eaMq",
+          "name": "UAT PAN"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.customerTelegramID }}",
+        "text": "={{ $json.customerMessage.text }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "d5fb77f8-1fca-4805-bb86-be4184504b80",
+      "name": "Send Win-back (Text)",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        512,
+        48
+      ],
+      "webhookId": "931ba41a-eb34-4b00-acb9-e4d508421e71",
+      "credentials": {
+        "telegramApi": {
+          "id": "vjliuOCYYRY2eaMq",
+          "name": "UAT PAN"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Every Hour": {
+      "main": [
+        [
+          {
+            "node": "Get Due Win-backs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Due Win-backs": {
+      "main": [
+        [
+          {
+            "node": "Has Win-backs?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Win-backs?": {
+      "main": [
+        [
+          {
+            "node": "Split Notifications",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Win-backs Today",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Notifications": {
+      "main": [
+        [
+          {
+            "node": "Has Image?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Image?": {
+      "main": [
+        [
+          {
+            "node": "Send Win-back (Photo)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Win-back (Text)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "58079352-2979-42f1-a87d-0f75a6ebf500",
+  "meta": {
+    "instanceId": "b4d61e6aac32db40bf6501d2d4b51d8e89fd170203b484a7728d624bfefd6fd0"
+  },
+  "id": "OMAj0RT5GX65jqVa",
+  "tags": []
+}

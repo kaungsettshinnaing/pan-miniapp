@@ -1,0 +1,216 @@
+{
+  "name": "UAT - PAN - Redemption Cancelled",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "pan-redemption-cancelled",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -480,
+        128
+      ],
+      "id": "cba0f9dd-94fc-4159-970a-c76f30bcc9a4",
+      "name": "Webhook1",
+      "webhookId": "pan-redemption-cancelled"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "has-image",
+              "leftValue": "={{ $json.body.customerMessage.imageURL }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -240,
+        128
+      ],
+      "id": "8dc04401-c844-40b5-aa7f-ec5dd01436a6",
+      "name": "Customer Has Image?"
+    },
+    {
+      "parameters": {
+        "operation": "sendPhoto",
+        "chatId": "={{ $('Webhook1').item.json.body.customerTelegramID }}",
+        "file": "https://wordpress-vygr.cashbackapp.cloud/wp-content/uploads/2026/06/QQ-OTP.png",
+        "additionalFields": {
+          "caption": "={{ $('Webhook1').item.json.body.customerMessage.text }}"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "e93eb41e-36ff-497c-933d-78ef9f485b80",
+      "name": "Customer Cancel (Photo)",
+      "webhookId": "886bcb94-21ae-4dc7-9449-4a60814009c8",
+      "credentials": {
+        "telegramApi": {
+          "id": "vjliuOCYYRY2eaMq",
+          "name": "UAT PAN"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Webhook1').item.json.body.customerTelegramID }}",
+        "text": "={{ $('Webhook1').item.json.body.customerMessage.text }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        240
+      ],
+      "id": "fc29651b-057c-49ad-8e0d-e86fd57d7c9e",
+      "name": "Customer Cancel (Text)",
+      "webhookId": "6912e7af-ef76-4896-a75f-b79caaaf5138",
+      "credentials": {
+        "telegramApi": {
+          "id": "vjliuOCYYRY2eaMq",
+          "name": "UAT PAN"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Webhook1').item.json.body.merchantTelegramID }}",
+        "text": "=⚠️ {{ $('Webhook1').item.json.body.customerName }} ၏ cashback PIN ကို ပယ်ဖျက်ပြီ။ PIN ထည့်ပေးရန် မလိုပါ။",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        0
+      ],
+      "id": "675b4ac7-0b3f-46ff-b16f-959639923690",
+      "name": "Notify Merchant (Photo path)",
+      "webhookId": "a7f5e3cb-f6ea-40d5-b457-b7a9ea6195f9",
+      "credentials": {
+        "telegramApi": {
+          "id": "vjliuOCYYRY2eaMq",
+          "name": "UAT PAN"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Webhook1').item.json.body.merchantTelegramID }}",
+        "text": "=⚠️ {{ $('Webhook1').item.json.body.customerName }} ၏ cashback PIN ကို ပယ်ဖျက်ပြီ။ PIN ထည့်ပေးရန် မလိုပါ။",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        240
+      ],
+      "id": "37e9e5e4-9cd7-48f0-a8fc-e0f4b81eb6e4",
+      "name": "Notify Merchant (Text path)",
+      "webhookId": "babcca16-b77c-4bc4-9942-87e00459d7bf",
+      "credentials": {
+        "telegramApi": {
+          "id": "vjliuOCYYRY2eaMq",
+          "name": "UAT PAN"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook1": {
+      "main": [
+        [
+          {
+            "node": "Customer Has Image?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Customer Has Image?": {
+      "main": [
+        [
+          {
+            "node": "Customer Cancel (Photo)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Customer Cancel (Text)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Customer Cancel (Photo)": {
+      "main": [
+        [
+          {
+            "node": "Notify Merchant (Photo path)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Customer Cancel (Text)": {
+      "main": [
+        [
+          {
+            "node": "Notify Merchant (Text path)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "13e5d60c-a509-46d8-bfd9-9d6b9c0caae6",
+  "meta": {
+    "instanceId": "b4d61e6aac32db40bf6501d2d4b51d8e89fd170203b484a7728d624bfefd6fd0"
+  },
+  "id": "VQ1aIs3R7bjR77HA",
+  "tags": []
+}
