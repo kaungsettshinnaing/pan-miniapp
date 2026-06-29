@@ -9,12 +9,10 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const dateParam = url.searchParams.get("date");
 
-    // Parse date — default to server's current date
-    const base = dateParam ? new Date(dateParam) : new Date();
-    const startOfDay = new Date(base);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(base);
-    endOfDay.setHours(23, 59, 59, 999);
+    // Interpret the date in Myanmar time (UTC+6:30) so day boundaries match the user's clock
+    const dateStr = dateParam ?? new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Rangoon" });
+    const startOfDay = new Date(`${dateStr}T00:00:00+06:30`);
+    const endOfDay = new Date(`${dateStr}T23:59:59.999+06:30`);
 
     const merchants = await prisma.merchant.findMany({
       where: { channelPartnerID: cpId },

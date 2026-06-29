@@ -54,7 +54,10 @@ async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
 
 function fmtKs(n: number) { return `Ks ${n.toLocaleString()}`; }
 function fmtPct(n: number) { return `${n}%`; }
-function todayISO() { return new Date().toISOString().split("T")[0]; }
+function todayISO() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 
 // ── Blank merchant form ───────────────────────────────────────────────────────
 const BLANK_FORM = {
