@@ -186,6 +186,13 @@ export async function POST(request: Request) {
       }
     );
 
+    // Store customerMessage on the OtpSession so the customer's mini-app can pick it
+    // up via /api/earn/status polling without needing another template resolution.
+    prisma.otpSession.update({
+      where: { id: otp.id },
+      data: { resultMessage: customerMessage as never },
+    }).catch(() => {});
+
     // Fire pan-cashback-issued only for in-app (non-n8n) redemptions.
     // When called via API secret (n8n cashier form), the combined n8n workflow
     // sends the customer success message directly from customerMessage in this response.

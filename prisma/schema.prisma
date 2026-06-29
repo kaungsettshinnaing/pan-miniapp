@@ -100,18 +100,22 @@ model Purchase {
 }
 
 model OtpSession {
-  id                 String   @id @default(cuid())
+  id                 String    @id @default(cuid())
   customerTelegramID String
   merchantURL        String
-  otpCode            String   // 4-digit code
+  otpCode            String    // 4-digit code
   totalCashback      Float
   expiresAt          DateTime
-  used               Boolean  @default(false)
-  merchant           Merchant @relation(fields: [merchantURL], references: [merchantURL])
-  customer           Customer @relation(fields: [customerTelegramID], references: [customerTelegramID])
-  createdAt          DateTime @default(now())
+  used               Boolean   @default(false)
+  cancelled          Boolean   @default(false)
+  cancelledAt        DateTime?
+  resultMessage      Json?     // resolved customerMessage stored after successful redemption (for customer polling)
+  merchant           Merchant  @relation(fields: [merchantURL], references: [merchantURL])
+  customer           Customer  @relation(fields: [customerTelegramID], references: [customerTelegramID])
+  createdAt          DateTime  @default(now())
 
   @@index([otpCode, merchantURL, used, expiresAt])
+  @@index([customerTelegramID, used, cancelled, expiresAt])
 }
 
 model MessageTemplate {
@@ -185,6 +189,7 @@ enum MessageTrigger {
   CASHBACK_ISSUED
   CASHBACK_ISSUED_WITH_REDEMPTION
   REDEMPTION_FAILURE
+  REDEMPTION_CANCELLED
   EXPIRY_FIRST_REMINDER
   EXPIRY_SECOND_REMINDER
   FIRST_RECALL_CAMPAIGN

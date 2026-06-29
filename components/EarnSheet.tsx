@@ -10,23 +10,56 @@ type EarnResult = {
   expiresAt: string;
 };
 
+export type PreloadedSession = {
+  sessionId: string;
+  otpCode: string;
+  merchantName: string;
+  merchantURL: string;
+  totalCashback: number;
+  expiresAt: string;
+};
+
+type ResolvedMsg = { trigger: string; text: string; imageURL: string | null };
+
+type StatusResult = {
+  status: "pending" | "redeemed" | "expired" | "cancelled";
+  customerMessage?: ResolvedMsg;
+  merchantName?: string;
+};
+
+type ViewState = "input" | "otp" | "success" | "failed";
+
 type Props = {
   initialMerchant?: string;
+  preloadedSession?: PreloadedSession;
   apiFetch: <T>(path: string, opts?: RequestInit) => Promise<T>;
   onClose: () => void;
   onSuccess: () => void;
 };
 
-export default function EarnSheet({ initialMerchant, apiFetch, onClose, onSuccess }: Props) {
+export default function EarnSheet({ initialMerchant, preloadedSession, apiFetch, onClose, onSuccess }: Props) {
   const [merchantCode, setMerchantCode] = useState(initialMerchant ?? "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<EarnResult | null>(null);
+  const [result, setResult] = useState<EarnResult | null>(
+    preloadedSession
+      ? {
+          sessionId: preloadedSession.sessionId,
+          otpCode: preloadedSession.otpCode,
+          merchantName: preloadedSession.merchantName,
+          totalCashback: preloadedSession.totalCashback,
+          expiresAt: preloadedSession.expiresAt,
+        }
+      : null
+  );
   const [secondsLeft, setSecondsLeft] = useState(0);
+  const [viewState, setViewState] = useState<ViewState>(preloadedSession ? "otp" : "input");
+  const [finalMessage, setFinalMessage] = useState<ResolvedMsg | null>(null);
+  const [cancelling, setCancelling] = useState(false);
 
-  // Auto-submit if merchant pre-filled
+  // Auto-submit if merchant pre-filled (only when no preloaded session)
   useEffect(() => {
-    if (initialMerchant) {
+    if (initialMerchant && !preloadedSession) {
       submit(initialMerchant);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -45,6 +78,34 @@ export default function EarnSheet({ initialMerchant, apiFetch, onClose, onSucces
     return () => clearInterval(interval);
   }, [result]);
 
+  // Poll for redemption result while customer is showing their PIN
+  useEffect(() => {
+    if (!result || viewState !== "otp") return;
+
+    const poll = async () => {
+      try {
+        const data = await apiFetch<StatusResult>(`/api/earn/status?sessionId=${result.sessionId}`);
+        if (data.status === "redeemed") {
+          setFinalMessage(data.customerMessage ?? null);
+          setViewState("success");
+          onSuccess();
+        } else if (data.status === "expired") {
+          setFinalMessage(data.customerMessage ?? null);
+          setViewState("failed");
+        } else if (data.status === "cancelled") {
+          // Cancelled from another session/device — just close
+          onClose();
+        }
+      } catch {
+        // Ignore polling errors silently
+      }
+    };
+
+    const interval = setInterval(poll, 3000);
+    return () => clearInterval(interval);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [result, viewState]);
+
   async function submit(code?: string) {
     const url = (code ?? merchantCode).trim();
     if (!url) return;
@@ -56,6 +117,7 @@ export default function EarnSheet({ initialMerchant, apiFetch, onClose, onSucces
         body: JSON.stringify({ merchantURL: url }),
       });
       setResult(data);
+      setViewState("otp");
       onSuccess();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to generate PIN");
@@ -64,14 +126,30 @@ export default function EarnSheet({ initialMerchant, apiFetch, onClose, onSucces
     }
   }
 
-  const expired = secondsLeft === 0 && result !== null;
+  async function handleCancel() {
+    if (result && secondsLeft > 0) {
+      // OTP still live — cancel it so cashier knows not to proceed
+      setCancelling(true);
+      try {
+        await apiFetch("/api/earn/cancel", {
+          method: "POST",
+          body: JSON.stringify({ sessionId: result.sessionId }),
+        });
+      } catch {
+        // Non-critical — still close
+      }
+    }
+    onClose();
+  }
+
+  const expired = secondsLeft === 0 && result !== null && viewState === "otp";
 
   return (
     <>
-      {/* Backdrop */}
+      {/* Backdrop — only closes on input state; during OTP require explicit Cancel */}
       <div
         className="fixed inset-0 z-40 bg-black/60 sheet-backdrop"
-        onClick={result ? onClose : onClose}
+        onClick={viewState === "input" ? onClose : undefined}
       />
 
       {/* Sheet */}
@@ -79,8 +157,8 @@ export default function EarnSheet({ initialMerchant, apiFetch, onClose, onSucces
         {/* Handle */}
         <div className="mx-auto mb-4 w-10 h-1 rounded-full bg-pan-border" />
 
-        {!result ? (
-          /* Earn Cashback — enter merchant code */
+        {/* ── INPUT STATE ── */}
+        {viewState === "input" && (
           <>
             <h2 className="text-lg font-bold text-white mb-1">🏷️ Earn Cashback</h2>
             <p className="text-pan-muted text-sm mb-5">
@@ -99,9 +177,7 @@ export default function EarnSheet({ initialMerchant, apiFetch, onClose, onSucces
               onKeyDown={(e) => e.key === "Enter" && submit()}
             />
 
-            {error && (
-              <p className="text-pan-pink text-xs mb-3">{error}</p>
-            )}
+            {error && <p className="text-pan-pink text-xs mb-3">{error}</p>}
 
             <div className="flex gap-3">
               <button
@@ -120,13 +196,14 @@ export default function EarnSheet({ initialMerchant, apiFetch, onClose, onSucces
               </button>
             </div>
           </>
-        ) : (
-          /* Show PIN to Cashier */
+        )}
+
+        {/* ── OTP STATE ── */}
+        {viewState === "otp" && result && (
           <>
             <h2 className="text-lg font-bold text-white mb-1">🔢 Show PIN to Cashier</h2>
             <p className="text-pan-muted text-sm mb-4">
-              Show the PIN below to the cashier. They will enter it in their app
-              to confirm your cashback redemption.
+              Show the PIN below to the cashier and wait while they confirm.
             </p>
 
             {/* Merchant + amount summary */}
@@ -154,14 +231,15 @@ export default function EarnSheet({ initialMerchant, apiFetch, onClose, onSucces
               >
                 {result.otpCode}
               </p>
-              {!expired && (
+              {!expired ? (
                 <p className="text-pan-muted text-xs mt-3">
-                  ✨ Valid for this visit only — expires in {Math.floor(secondsLeft / 60)}:
+                  Waiting for cashier · expires in {Math.floor(secondsLeft / 60)}:
                   {String(secondsLeft % 60).padStart(2, "0")}
                 </p>
-              )}
-              {expired && (
-                <p className="text-pan-pink text-xs mt-3">⚠️ PIN expired — tap Done and try again</p>
+              ) : (
+                <p className="text-pan-pink text-xs mt-3">
+                  ⚠️ PIN expired — please cancel and try again
+                </p>
               )}
             </div>
 
@@ -170,12 +248,68 @@ export default function EarnSheet({ initialMerchant, apiFetch, onClose, onSucces
             </p>
 
             <button
+              onClick={handleCancel}
+              disabled={cancelling}
+              className="w-full rounded-xl py-3 text-sm font-bold text-pan-muted border border-pan-border cursor-pointer disabled:opacity-50"
+            >
+              {cancelling ? "Cancelling…" : "Cancel"}
+            </button>
+          </>
+        )}
+
+        {/* ── SUCCESS STATE ── */}
+        {viewState === "success" && (
+          <div className="text-center py-4">
+            <div className="text-6xl mb-4">✅</div>
+            <h2 className="text-xl font-black text-white mb-3">Cashback Redeemed!</h2>
+            {finalMessage && (
+              <div
+                className="rounded-xl px-4 py-4 mb-6 text-left"
+                style={{
+                  background: "rgba(34,197,94,0.08)",
+                  border: "1px solid rgba(34,197,94,0.25)",
+                }}
+              >
+                <p className="text-[13px] text-white leading-relaxed whitespace-pre-line">
+                  {finalMessage.text}
+                </p>
+              </div>
+            )}
+            <button
               onClick={onClose}
-              className="w-full rounded-xl py-3 text-sm font-bold text-white bg-pan-card border border-pan-border cursor-pointer"
+              className="w-full rounded-xl py-3 text-sm font-bold text-white cursor-pointer active:opacity-80"
+              style={{ background: "linear-gradient(135deg, #f0206a 0%, #c01253 100%)" }}
             >
               Done
             </button>
-          </>
+          </div>
+        )}
+
+        {/* ── FAILED / EXPIRED STATE ── */}
+        {viewState === "failed" && (
+          <div className="text-center py-4">
+            <div className="text-6xl mb-4">⏰</div>
+            <h2 className="text-xl font-black text-white mb-3">PIN Expired</h2>
+            {finalMessage && (
+              <div
+                className="rounded-xl px-4 py-4 mb-6 text-left"
+                style={{
+                  background: "rgba(240,32,106,0.08)",
+                  border: "1px solid rgba(240,32,106,0.25)",
+                }}
+              >
+                <p className="text-[13px] text-pan-muted leading-relaxed whitespace-pre-line">
+                  {finalMessage.text}
+                </p>
+              </div>
+            )}
+            <button
+              onClick={onClose}
+              className="w-full rounded-xl py-3 text-sm font-bold text-pan-muted border border-pan-border cursor-pointer"
+            >
+              Close
+            </button>
+          </div>
         )}
       </div>
     </>

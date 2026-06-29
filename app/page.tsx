@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import BalanceHero from "@/components/BalanceHero";
 import MerchantCard from "@/components/MerchantCard";
-import EarnSheet from "@/components/EarnSheet";
+import EarnSheet, { type PreloadedSession } from "@/components/EarnSheet";
 import ProfileSheet from "@/components/ProfileSheet";
 import MerchantProcessSheet from "@/components/MerchantProcessSheet";
 import TemplateEditorSheet from "@/components/TemplateEditorSheet";
@@ -96,6 +96,7 @@ export default function Home() {
   const [merchantOpen, setMerchantOpen] = useState(false);
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [earnMerchant, setEarnMerchant] = useState<string | undefined>();
+  const [preloadedSession, setPreloadedSession] = useState<PreloadedSession | undefined>();
 
   const tgUser = typeof window !== "undefined"
     ? window.Telegram?.WebApp?.initDataUnsafe?.user
@@ -110,6 +111,7 @@ export default function Home() {
     }
     load();
     loadMerchantMeta();
+    checkActiveSession();
 
     const handleVisibility = () => {
       if (document.visibilityState === "visible") load();
@@ -129,6 +131,18 @@ export default function Home() {
       setError(e instanceof Error ? e.message : "Failed to load");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function checkActiveSession() {
+    try {
+      const data = await apiFetch<{ session: PreloadedSession | null }>("/api/earn/active");
+      if (data.session) {
+        setPreloadedSession(data.session);
+        setEarnOpen(true);
+      }
+    } catch {
+      // Non-critical — customer just won't see the auto-popup
     }
   }
 
@@ -335,10 +349,12 @@ export default function Home() {
       {earnOpen && (
         <EarnSheet
           initialMerchant={earnMerchant}
+          preloadedSession={preloadedSession}
           apiFetch={apiFetch}
           onClose={() => {
             setEarnOpen(false);
             setEarnMerchant(undefined);
+            setPreloadedSession(undefined);
             load();
           }}
           onSuccess={load}

@@ -213,7 +213,9 @@ createdAt       DateTime @default(now())
 @@unique([merchantURL, billingMonth])
 ```
 
-Not yet auto-generated — Phase 5 (billing engine) will populate this monthly.
+Upserted on every redemption in the atomic `$transaction` (see `/api/redeem`). `totalCommission` and `totalDue` accumulate across the month. `subscriptionFee` is set only on the first upsert (CREATE path) — does not accumulate on subsequent redemptions.
+
+Phase 5 (billing engine) will generate invoices from this table — the invoice/payment flow is not yet built.
 
 ---
 

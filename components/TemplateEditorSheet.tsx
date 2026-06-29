@@ -13,6 +13,7 @@ const TRIGGER_LABELS: Record<string, string> = {
   CASHBACK_ISSUED: "💰 Cashback Issued",
   CASHBACK_ISSUED_WITH_REDEMPTION: "✅ Cashback Issued (after redemption)",
   REDEMPTION_FAILURE: "❌ Redemption Failure",
+  REDEMPTION_CANCELLED: "🚫 Redemption Cancelled",
   EXPIRY_FIRST_REMINDER: "⏰ Expiry Reminder #1",
   EXPIRY_SECOND_REMINDER: "⏰ Expiry Reminder #2",
   FIRST_RECALL_CAMPAIGN: "📣 Win-back Campaign #1",

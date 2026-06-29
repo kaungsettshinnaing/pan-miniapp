@@ -13,6 +13,7 @@ export type MessageTriggerKey =
   | "CASHBACK_ISSUED"
   | "CASHBACK_ISSUED_WITH_REDEMPTION"
   | "REDEMPTION_FAILURE"
+  | "REDEMPTION_CANCELLED"
   | "EXPIRY_FIRST_REMINDER"
   | "EXPIRY_SECOND_REMINDER"
   | "FIRST_RECALL_CAMPAIGN"
@@ -26,6 +27,8 @@ const DEFAULTS: Partial<Record<MessageTriggerKey, string>> = {
     "✅ Thanks for visiting {{merchantName}}!\n\nPurchase: {{purchaseAmount}}\nNew cashback earned: {{cashbackAmt}}\nValid until {{expiryDate}}.",
   REDEMPTION_FAILURE:
     "⚠️ Your redemption at {{merchantName}} could not be completed. Please try again or ask the cashier for help.",
+  REDEMPTION_CANCELLED:
+    "😔 Your cashback redemption at {{merchantName}} was cancelled. Come visit us again soon!",
 };
 
 // `trigger` is echoed back so n8n (and anyone reading the webhook body) can see
