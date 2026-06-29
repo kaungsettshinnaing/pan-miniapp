@@ -24,7 +24,8 @@ export async function POST(request: Request) {
     let merchantURL: string;
     let merchantURLs: string[];
     const apiSecret = request.headers.get("x-api-secret");
-    if (apiSecret && process.env.API_SECRET && apiSecret === process.env.API_SECRET) {
+    const isN8nCall = !!(apiSecret && process.env.API_SECRET && apiSecret === process.env.API_SECRET);
+    if (isN8nCall) {
       if (!body.merchantURL) return err("merchantURL required for API secret auth", 400);
       merchantURL = body.merchantURL;
       merchantURLs = [merchantURL];
@@ -185,9 +186,11 @@ export async function POST(request: Request) {
       }
     );
 
-    // Fire-and-forget → n8n sends Telegram messages to customer
+    // Fire pan-cashback-issued only for in-app (non-n8n) redemptions.
+    // When called via API secret (n8n cashier form), the combined n8n workflow
+    // sends the customer success message directly from customerMessage in this response.
     const n8nUrl = await getSetting("N8N_WEBHOOK_URL");
-    if (n8nUrl) {
+    if (n8nUrl && !isN8nCall) {
       fetch(`${n8nUrl}/pan-cashback-issued`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -216,6 +219,7 @@ export async function POST(request: Request) {
       customerName,
       expiryDate: newCashbackAmt > 0 ? expiryDate.toISOString() : null,
       expiryDateFormatted: newCashbackAmt > 0 ? formatDate(expiryDate) : null,
+      customerMessage,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Unknown error";

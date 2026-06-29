@@ -1,0 +1,100 @@
+{
+  "name": "UAT - PAN - Bot Earn Trigger",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": ["message"],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.1,
+      "position": [-640, 0],
+      "id": "bb000001-0000-4000-8000-000000000001",
+      "name": "Bot Message",
+      "webhookId": "pan-bot-earn-trigger",
+      "credentials": { "telegramApi": { "id": "vjliuOCYYRY2eaMq", "name": "UAT PAN" } }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.APP_BASE_URL }}/api/earn",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-secret", "value": "REPLACE_WITH_API_SECRET" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "bodyParameters": {
+          "parameters": [
+            { "name": "merchantURL", "value": "={{ $json.message.text.trim() }}" },
+            { "name": "customerTelegramID", "value": "={{ $json.message.from.id }}" },
+            { "name": "customerName", "value": "={{ $json.message.from.first_name }}" }
+          ]
+        },
+        "options": {
+          "response": { "response": { "neverError": true } }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-400, 0],
+      "id": "bb000002-0000-4000-8000-000000000002",
+      "name": "Call Earn API"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 1 },
+          "conditions": [
+            {
+              "id": "earn-ok",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [-160, 0],
+      "id": "bb000003-0000-4000-8000-000000000003",
+      "name": "Earn OK?"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Bot Message').item.json.message.from.id }}",
+        "text": "=❌ {{ $('Call Earn API').item.json.error || 'Something went wrong. Please try again.' }}",
+        "additionalFields": { "appendAttribution": false }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [80, 120],
+      "id": "bb000004-0000-4000-8000-000000000004",
+      "name": "Send Error to Customer",
+      "credentials": { "telegramApi": { "id": "vjliuOCYYRY2eaMq", "name": "UAT PAN" } }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Bot Message": {
+      "main": [[{ "node": "Call Earn API", "type": "main", "index": 0 }]]
+    },
+    "Call Earn API": {
+      "main": [[{ "node": "Earn OK?", "type": "main", "index": 0 }]]
+    },
+    "Earn OK?": {
+      "main": [
+        [],
+        [{ "node": "Send Error to Customer", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "tags": []
+}

@@ -110,6 +110,12 @@ export default function Home() {
     }
     load();
     loadMerchantMeta();
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") load();
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -333,6 +339,7 @@ export default function Home() {
           onClose={() => {
             setEarnOpen(false);
             setEarnMerchant(undefined);
+            load();
           }}
           onSuccess={load}
         />
