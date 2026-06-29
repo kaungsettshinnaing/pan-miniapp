@@ -24,7 +24,7 @@ const DEFAULTS: Partial<Record<MessageTriggerKey, string>> = {
   CASHBACK_ISSUED:
     "🎁 {{merchantName}}\n\nYour cashback balance: {{cashbackAmt}}\nYour PIN: {{pin}}\n\nShow this PIN to the cashier to redeem. Valid for this visit only.",
   CASHBACK_ISSUED_WITH_REDEMPTION:
-    "✅ Thanks for visiting {{merchantName}}!\n\nPurchase: {{purchaseAmount}}\nNew cashback earned: {{cashbackAmt}}\nValid until {{expiryDate}}.",
+    "✅ Thanks for visiting {{merchantName}}!\n\nPurchase: {{purchaseAmount}}\nCashback redeemed: {{redeemedAmt}}\nNew cashback earned: {{cashbackAmt}}\nValid until {{expiryDate}}.",
   REDEMPTION_FAILURE:
     "⚠️ Your redemption at {{merchantName}} could not be completed. Please try again or ask the cashier for help.",
   REDEMPTION_CANCELLED:

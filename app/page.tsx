@@ -8,6 +8,7 @@ import ProfileSheet from "@/components/ProfileSheet";
 import MerchantProcessSheet from "@/components/MerchantProcessSheet";
 import TemplateEditorSheet from "@/components/TemplateEditorSheet";
 import { translations, type Lang } from "@/lib/i18n";
+import { highlight } from "@/lib/highlight";
 
 type Cashback = {
   id: string;
@@ -99,7 +100,13 @@ export default function Home() {
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [earnMerchant, setEarnMerchant] = useState<string | undefined>();
   const [preloadedSession, setPreloadedSession] = useState<PreloadedSession | undefined>();
-  const [lang, setLangState] = useState<Lang>("EN");
+  const [lang, setLangState] = useState<Lang>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("pan_lang") as Lang | null;
+      if (saved === "EN" || saved === "MM") return saved;
+    }
+    return "MM";
+  });
 
   function setLang(l: Lang) {
     setLangState(l);
@@ -114,12 +121,6 @@ export default function Home() {
   const displayName = profile?.firstName ?? tgUser?.first_name ?? "there";
 
   useEffect(() => {
-    // Restore language from localStorage
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("pan_lang") as Lang | null;
-      if (saved === "EN" || saved === "MM") setLangState(saved);
-    }
-
     const tg = window.Telegram?.WebApp;
     if (tg) {
       tg.ready();
@@ -276,18 +277,18 @@ export default function Home() {
               boxShadow: "0 4px 16px rgba(240,32,106,0.4)",
             }}
           >
-            {t.earnCashbackBtn}
+            {highlight(t.earnCashbackBtn)}
           </button>
 
           {!loading && !error && (
             <section>
               <p className="text-[13px] font-bold text-pan-muted uppercase tracking-wide mb-3">
-                {t.yourCashback}
+                {highlight(t.yourCashback)}
               </p>
               {balance?.cashbacks.length === 0 ? (
                 <div className="text-center py-12">
-                  <p className="text-pan-muted text-sm">{t.noActiveCashback}</p>
-                  <p className="text-pan-muted text-xs mt-1">{t.noActiveCashbackHint}</p>
+                  <p className="text-pan-muted text-sm">{highlight(t.noActiveCashback)}</p>
+                  <p className="text-pan-muted text-xs mt-1">{highlight(t.noActiveCashbackHint)}</p>
                 </div>
               ) : (
                 balance?.cashbacks.map((c) => (
@@ -317,9 +318,9 @@ export default function Home() {
             )}
             <p className="text-pan-gold text-xs mt-2 font-bold">
               {t.earnLabel}:{" "}
-              {merchantMeta.merchant.earnType === "PERCENTAGE"
+              {highlight(merchantMeta.merchant.earnType === "PERCENTAGE"
                 ? t.percentageCashback(merchantMeta.merchant.earnValue)
-                : t.fixedCashback(merchantMeta.merchant.earnValue)}
+                : t.fixedCashback(merchantMeta.merchant.earnValue))}
             </p>
           </div>
 
@@ -332,7 +333,7 @@ export default function Home() {
               boxShadow: "0 4px 16px rgba(240,32,106,0.2)",
             }}
           >
-            {t.processRedemption}
+            {highlight(t.processRedemption)}
             <p className="text-pan-muted text-sm font-normal mt-1">{t.processRedemptionHint}</p>
           </button>
 
@@ -359,7 +360,7 @@ export default function Home() {
           >
             <span className="text-xl">{tab === "customer" ? "💰" : "👤"}</span>
             <span className={`text-[11px] font-bold ${tab === "customer" ? "text-pan-pink" : "text-pan-muted"}`}>
-              {t.myCashbackTab}
+              {highlight(t.myCashbackTab)}
             </span>
           </button>
           <div className="w-px bg-pan-border my-2" />

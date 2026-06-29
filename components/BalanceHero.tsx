@@ -1,4 +1,5 @@
 import { translations, type Lang } from "@/lib/i18n";
+import { highlight } from "@/lib/highlight";
 
 type Props = {
   totalBalance: number;
@@ -19,7 +20,7 @@ export default function BalanceHero({ totalBalance, merchantCount, expiringCount
       <span className="absolute -left-8 -bottom-10 w-28 h-28 rounded-full opacity-10" style={{ background: "#f0206a" }} />
 
       <p className="relative text-[11px] text-pan-muted uppercase tracking-widest mb-1">
-        {t.totalBalance}
+        {highlight(t.totalBalance)}
       </p>
       <div className="relative flex items-baseline gap-2 mb-4">
         <span className="text-sm font-bold text-white">Ks</span>

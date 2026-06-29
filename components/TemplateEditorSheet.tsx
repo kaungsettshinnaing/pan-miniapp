@@ -20,14 +20,62 @@ const TRIGGER_LABELS: Record<string, string> = {
   SECOND_RECALL_CAMPAIGN: "📣 Win-back Campaign #2",
 };
 
-// {{pin}} only renders for the "Cashback Issued" message (the earn/PIN message);
-// the others render wherever their data is available for that trigger.
-const VARIABLES = ["{{pin}}", "{{cashbackAmt}}", "{{expiryDate}}", "{{merchantName}}", "{{purchaseAmount}}", "{{customerName}}", "{{reminderDays}}"];
+type VarDef = { variable: string; label: string };
+
+// Per-trigger variable definitions — only show what's actually available for each trigger.
+// {{redeemedAmt}} = cashback balance used/redeemed; {{cashbackAmt}} = newly issued cashback.
+const TRIGGER_VARS: Record<string, VarDef[]> = {
+  CASHBACK_ISSUED: [
+    { variable: "{{merchantName}}", label: "Merchant name" },
+    { variable: "{{cashbackAmt}}", label: "Cashback balance" },
+    { variable: "{{expiryDate}}", label: "Expiry date" },
+    { variable: "{{pin}}", label: "Redemption PIN" },
+    { variable: "{{customerName}}", label: "Customer name" },
+  ],
+  CASHBACK_ISSUED_WITH_REDEMPTION: [
+    { variable: "{{merchantName}}", label: "Merchant name" },
+    { variable: "{{redeemedAmt}}", label: "Cashback redeemed (used)" },
+    { variable: "{{cashbackAmt}}", label: "New cashback earned" },
+    { variable: "{{purchaseAmount}}", label: "Purchase amount" },
+    { variable: "{{expiryDate}}", label: "New cashback expiry" },
+    { variable: "{{customerName}}", label: "Customer name" },
+  ],
+  REDEMPTION_FAILURE: [
+    { variable: "{{merchantName}}", label: "Merchant name" },
+    { variable: "{{customerName}}", label: "Customer name" },
+  ],
+  REDEMPTION_CANCELLED: [
+    { variable: "{{merchantName}}", label: "Merchant name" },
+    { variable: "{{customerName}}", label: "Customer name" },
+  ],
+  EXPIRY_FIRST_REMINDER: [
+    { variable: "{{merchantName}}", label: "Merchant name" },
+    { variable: "{{cashbackAmt}}", label: "Cashback balance" },
+    { variable: "{{expiryDate}}", label: "Expiry date" },
+    { variable: "{{reminderDays}}", label: "Days until expiry" },
+    { variable: "{{customerName}}", label: "Customer name" },
+  ],
+  EXPIRY_SECOND_REMINDER: [
+    { variable: "{{merchantName}}", label: "Merchant name" },
+    { variable: "{{cashbackAmt}}", label: "Cashback balance" },
+    { variable: "{{expiryDate}}", label: "Expiry date" },
+    { variable: "{{reminderDays}}", label: "Days until expiry" },
+    { variable: "{{customerName}}", label: "Customer name" },
+  ],
+  FIRST_RECALL_CAMPAIGN: [
+    { variable: "{{merchantName}}", label: "Merchant name" },
+    { variable: "{{customerName}}", label: "Customer name" },
+  ],
+  SECOND_RECALL_CAMPAIGN: [
+    { variable: "{{merchantName}}", label: "Merchant name" },
+    { variable: "{{customerName}}", label: "Customer name" },
+  ],
+};
 
 type Props = {
   apiFetch: <T>(path: string, opts?: RequestInit) => Promise<T>;
   onClose: () => void;
-  adminMerchantURL?: string; // when set, uses admin endpoint for this specific merchant
+  adminMerchantURL?: string;
 };
 
 export default function TemplateEditorSheet({ apiFetch, onClose, adminMerchantURL }: Props) {
@@ -86,6 +134,8 @@ export default function TemplateEditorSheet({ apiFetch, onClose, adminMerchantUR
     setForm((f) => ({ ...f, messageText: f.messageText + v }));
   }
 
+  const currentVars = selected ? (TRIGGER_VARS[selected] ?? []) : [];
+
   return (
     <>
       <div className="fixed inset-0 z-40 bg-black/60" onClick={onClose} />
@@ -100,7 +150,9 @@ export default function TemplateEditorSheet({ apiFetch, onClose, adminMerchantUR
             </p>
             {loading ? (
               <div className="space-y-2">
-                {[1,2,3].map(i => <div key={i} className="h-12 rounded-xl bg-pan-card animate-pulse" />)}
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="h-12 rounded-xl bg-pan-card animate-pulse" />
+                ))}
               </div>
             ) : (
               <div className="space-y-2">
@@ -121,7 +173,10 @@ export default function TemplateEditorSheet({ apiFetch, onClose, adminMerchantUR
                 })}
               </div>
             )}
-            <button onClick={onClose} className="w-full rounded-xl py-3 text-sm font-bold text-pan-muted border border-pan-border mt-4 cursor-pointer">
+            <button
+              onClick={onClose}
+              className="w-full rounded-xl py-3 text-sm font-bold text-pan-muted border border-pan-border mt-4 cursor-pointer"
+            >
               Close
             </button>
           </>
@@ -132,8 +187,9 @@ export default function TemplateEditorSheet({ apiFetch, onClose, adminMerchantUR
             </button>
             <h2 className="text-base font-bold text-white mb-4">{TRIGGER_LABELS[selected]}</h2>
 
-            {/* Image URL */}
-            <p className="text-pan-muted text-xs uppercase tracking-widest font-bold mb-1">Image URL (optional)</p>
+            <p className="text-pan-muted text-xs uppercase tracking-widest font-bold mb-1">
+              Image URL (optional)
+            </p>
             <input
               type="text"
               value={form.imageURL}
@@ -142,26 +198,28 @@ export default function TemplateEditorSheet({ apiFetch, onClose, adminMerchantUR
               className="w-full bg-pan-card border border-pan-border rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-pan-pink mb-4"
             />
 
-            {/* Message text */}
-            <p className="text-pan-muted text-xs uppercase tracking-widest font-bold mb-1">Message Text</p>
+            <p className="text-pan-muted text-xs uppercase tracking-widest font-bold mb-1">
+              Message Text
+            </p>
             <textarea
               value={form.messageText}
               onChange={(e) => setForm({ ...form, messageText: e.target.value })}
-              placeholder="Your cashback of {{cashbackAmt}} is ready! Valid until {{expiryDate}}."
+              placeholder="Leave blank to use the default message."
               rows={5}
               className="w-full bg-pan-card border border-pan-border rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-pan-pink mb-3 resize-none"
             />
 
-            {/* Variable chips */}
+            {/* Per-trigger variable chips with labels */}
             <p className="text-pan-muted text-xs mb-2">Tap to insert variable:</p>
-            <div className="flex flex-wrap gap-2 mb-5">
-              {VARIABLES.map((v) => (
+            <div className="flex flex-col gap-2 mb-5">
+              {currentVars.map(({ variable, label }) => (
                 <button
-                  key={v}
-                  onClick={() => insertVar(v)}
-                  className="px-3 py-1 rounded-full bg-pan-card border border-pan-border text-pan-gold text-xs font-bold cursor-pointer"
+                  key={variable}
+                  onClick={() => insertVar(variable)}
+                  className="flex items-center gap-3 rounded-xl bg-pan-card border border-pan-border px-3 py-2.5 cursor-pointer text-left"
                 >
-                  {v}
+                  <span className="text-pan-gold text-xs font-black font-latin shrink-0">{variable}</span>
+                  <span className="text-pan-muted text-xs">{label}</span>
                 </button>
               ))}
             </div>
@@ -169,7 +227,10 @@ export default function TemplateEditorSheet({ apiFetch, onClose, adminMerchantUR
             {saved && <p className="text-green-400 text-xs text-center mb-3">✓ Saved</p>}
 
             <div className="flex gap-3">
-              <button onClick={() => setSelected(null)} className="flex-1 rounded-xl py-3 text-sm font-bold text-pan-muted border border-pan-border cursor-pointer">
+              <button
+                onClick={() => setSelected(null)}
+                className="flex-1 rounded-xl py-3 text-sm font-bold text-pan-muted border border-pan-border cursor-pointer"
+              >
                 Cancel
               </button>
               <button

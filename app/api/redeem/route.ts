@@ -178,6 +178,7 @@ export async function POST(request: Request) {
       merchant.merchantURL,
       "CASHBACK_ISSUED_WITH_REDEMPTION",
       {
+        redeemedAmt: formatKs(otp.totalCashback),
         cashbackAmt: formatKs(newCashbackAmt),
         purchaseAmount: formatKs(purchaseAmount),
         expiryDate: formatDate(expiryDate),

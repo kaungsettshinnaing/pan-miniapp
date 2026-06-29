@@ -1,7 +1,7 @@
 /**
  * Substitutes {{variable}} placeholders in a message template.
- * Supports: {{cashbackAmt}}, {{expiryDate}}, {{merchantName}}, {{purchaseAmount}},
- *           {{customerName}}, {{reminderDays}}, {{pin}}
+ * Supports: {{cashbackAmt}}, {{redeemedAmt}}, {{expiryDate}}, {{merchantName}},
+ *           {{purchaseAmount}}, {{customerName}}, {{reminderDays}}, {{pin}}
  */
 export function renderTemplate(
   template: string,

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { translations, type Lang } from "@/lib/i18n";
+import { highlight } from "@/lib/highlight";
 
 type EarnResult = {
   sessionId: string;
@@ -159,8 +160,8 @@ export default function EarnSheet({ initialMerchant, preloadedSession, lang, api
         {/* INPUT */}
         {viewState === "input" && (
           <>
-            <h2 className="text-lg font-bold text-white mb-1">{t.earnTitle}</h2>
-            <p className="text-pan-muted text-sm mb-5">{t.earnHint}</p>
+            <h2 className="text-lg font-bold text-white mb-1">{highlight(t.earnTitle)}</h2>
+            <p className="text-pan-muted text-sm mb-5">{highlight(t.earnHint)}</p>
 
             <input
               type="text"
@@ -212,7 +213,7 @@ export default function EarnSheet({ initialMerchant, preloadedSession, lang, api
               style={{ border: "2px dashed rgba(240,32,106,0.6)", background: "rgba(240,32,106,0.05)" }}
             >
               <p className="text-[11px] font-bold text-pan-pink uppercase tracking-widest mb-2">
-                {t.yourPin}
+                {highlight(t.yourPin)}
               </p>
               <p
                 className="font-black font-latin text-5xl tracking-[0.3em] text-white pin-pop"
@@ -243,7 +244,7 @@ export default function EarnSheet({ initialMerchant, preloadedSession, lang, api
         {viewState === "success" && (
           <div className="text-center py-4">
             <div className="text-6xl mb-4">✅</div>
-            <h2 className="text-xl font-black text-white mb-3">{t.redeemedTitle}</h2>
+            <h2 className="text-xl font-black text-white mb-3">{highlight(t.redeemedTitle)}</h2>
             {finalMessage && (
               <div
                 className="rounded-xl px-4 py-4 mb-6 text-left"
